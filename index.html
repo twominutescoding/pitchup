@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Srijeda Nogomet</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <span class="ball">⚽</span>
+      <div class="header-text">
+        <h1>Srijeda Nogomet</h1>
+        <span class="tagline">Amaterska liga</span>
+      </div>
+      <div class="header-right">
+        <span class="reg-status" id="reg-status"></span>
+        <!-- Placeholder za Google login gumb -->
+        <div class="mock-user-pill" title="Demo: klikni za promjenu korisnika" onclick="nextMockUser()">
+          <span class="mock-user-avatar" id="mock-avatar">L</span>
+          <span id="mock-nick">LukaB</span>
+          <span id="mock-role-badge" class="role-badge role-admin">ADMIN</span>
+          <span class="mock-tag">demo</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Lijevi panel -->
+    <div class="left-panel">
+
+      <!-- Session bar -->
+      <div class="session-bar">
+        <span class="session-date-label">📅</span>
+        <span class="session-date" id="next-wednesday">—</span>
+        <div class="session-controls">
+
+          <!-- Teren dropdown -->
+          <div class="cs" id="cs-field">
+            <button class="cs-btn" onclick="toggleCs('cs-field')">
+              <span class="cs-val">Velesajam 2</span>
+              <svg class="cs-arrow" viewBox="0 0 10 6" width="10" height="6"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+            </button>
+            <div class="cs-menu">
+              <div class="cs-opt active" onclick="pickCs('cs-field', this, 'Velesajam 2')">Velesajam 2</div>
+              <div class="cs-opt"        onclick="pickCs('cs-field', this, 'Velesajam 1')">Velesajam 1</div>
+              <div class="cs-opt"        onclick="pickCs('cs-field', this, 'Špansko')">Špansko</div>
+            </div>
+          </div>
+
+          <!-- Termin dropdown -->
+          <div class="cs" id="cs-time">
+            <button class="cs-btn" onclick="toggleCs('cs-time')">
+              <span class="cs-val">19 – 20h</span>
+              <svg class="cs-arrow" viewBox="0 0 10 6" width="10" height="6"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+            </button>
+            <div class="cs-menu">
+              <div class="cs-opt active" onclick="pickCs('cs-time', this, '19 – 20h')">19 – 20h</div>
+              <div class="cs-opt"        onclick="pickCs('cs-time', this, '18 – 19h')">18 – 19h</div>
+              <div class="cs-opt"        onclick="pickCs('cs-time', this, '20 – 21h')">20 – 21h</div>
+            </div>
+          </div>
+
+
+</div>
+      </div>
+
+      <!-- Prijava -->
+      <div class="card reg-card">
+        <!-- Zatvoreno stanje -->
+        <div id="reg-locked" class="reg-locked hidden">
+          <span class="lock-icon">🔒</span>
+          <span id="reg-locked-msg">Admin još nije otvorio prijave.</span>
+        </div>
+        <!-- Otvoreno stanje -->
+        <div id="reg-open">
+          <div class="reg-inner">
+            <div class="current-user">
+              <div class="user-avatar" id="reg-avatar">L</div>
+              <div class="user-info">
+                <span class="user-nick" id="reg-nick">LukaB</span>
+                <span class="user-label">prijavljen kao</span>
+              </div>
+            </div>
+            <button class="btn-register" id="register-btn" onclick="registerPlayer()">Prijavi se</button>
+          </div>
+          <p class="reg-note" id="reg-note"></p>
+        </div>
+      </div>
+
+      <!-- Igrači -->
+      <div class="card players-card">
+        <div class="players-header">
+          <div class="players-title">
+            <span class="section-label">Prijavljeni</span>
+            <span id="player-count" class="badge">0</span>
+          </div>
+          <button id="draw-btn" class="btn-draw hidden" onclick="drawTeams()">🎲 Žrijebaj</button>
+        </div>
+        <div id="team-legend" class="team-legend hidden"></div>
+        <div id="players-list"></div>
+      </div>
+
+      <!-- Admin panel -->
+      <div class="card admin-card hidden" id="admin-card">
+        <div class="players-title" style="margin-bottom:12px;">
+          <span class="section-label">⚙️ Admin</span>
+          <span class="admin-badge">ADMIN</span>
+        </div>
+
+        <!-- Upravljanje sesijom -->
+        <div class="admin-section">
+          <label class="admin-label">Sesija</label>
+
+          <!-- Prijave zatvorene -->
+          <div id="ui-session-closed">
+            <p class="session-next-date">Sljedeća srijeda: <strong id="next-wed-display">—</strong></p>
+            <button class="btn-open-session" onclick="openSession()">Otvori prijave →</button>
+          </div>
+
+          <!-- Prijave otvorene -->
+          <div id="ui-session-open" class="hidden">
+            <div class="session-status-row">
+              <span class="session-open-dot">● Prijave otvorene</span>
+              <button class="btn-admin" onclick="closeSession()">Zatvori</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Akcije dostupne samo kad su prijave otvorene -->
+        <div id="admin-actions" class="hidden">
+
+          <!-- Dodaj igrača u ime nekoga -->
+          <div class="admin-section">
+            <label class="admin-label">Dodaj igrača (u ime)</label>
+            <div class="admin-form">
+              <select id="admin-player-select" class="admin-select">
+                <option value="">— odaberi —</option>
+              </select>
+              <button class="btn-admin" onclick="addPlayerAsAdmin()">Dodaj</button>
+            </div>
+          </div>
+
+          <!-- Upiši rezultat -->
+          <div class="admin-section">
+            <label class="admin-label">Upiši rezultat</label>
+            <div class="result-form">
+              <div class="result-side">
+                <span class="result-team-name" id="result-label-a">Tim A</span>
+                <input type="number" id="score-a" class="score-input" value="0" min="0" max="99">
+              </div>
+              <span class="result-dash">–</span>
+              <div class="result-side result-side-b">
+                <input type="number" id="score-b" class="score-input" value="0" min="0" max="99">
+                <span class="result-team-name" id="result-label-b">Tim B</span>
+              </div>
+            </div>
+            <button class="btn-save-result" onclick="submitResult()">Spremi rezultat</button>
+            <p class="admin-note" id="result-note"></p>
+          </div>
+
+        </div><!-- /admin-actions -->
+      </div>
+
+      <!-- Povijest rezultata -->
+      <div class="card history-card">
+        <div class="players-title" style="margin-bottom:10px;">
+          <span class="section-label">📋 Rezultati</span>
+        </div>
+        <div id="history-list"></div>
+      </div>
+
+    </div><!-- /left-panel -->
+
+    <!-- Desni panel — teren -->
+    <div class="right-panel">
+      <div class="card pitch-card">
+        <div class="pitch-wrap">
+          <svg id="pitch" viewBox="0 0 500 320" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <!-- Player sphere gradients -->
+              <radialGradient id="rg-gold" cx="36%" cy="30%" r="68%">
+                <stop offset="0%"   stop-color="#ffe060"/>
+                <stop offset="55%"  stop-color="#c89010"/>
+                <stop offset="100%" stop-color="#6a4400"/>
+              </radialGradient>
+              <radialGradient id="rg-blue" cx="36%" cy="30%" r="68%">
+                <stop offset="0%"   stop-color="#78c0ff"/>
+                <stop offset="55%"  stop-color="#1860d8"/>
+                <stop offset="100%" stop-color="#061840"/>
+              </radialGradient>
+              <radialGradient id="rg-neutral" cx="36%" cy="30%" r="68%">
+                <stop offset="0%"   stop-color="#b8c8c0"/>
+                <stop offset="55%"  stop-color="#5a7068"/>
+                <stop offset="100%" stop-color="#1a2822"/>
+              </radialGradient>
+              <!-- Stadium lights: bright centre, dark edges -->
+              <radialGradient id="rg-light" cx="250" cy="148" r="210" gradientUnits="userSpaceOnUse">
+                <stop offset="0%"   stop-color="rgba(255,255,220,0.13)"/>
+                <stop offset="58%"  stop-color="rgba(255,255,255,0.0)"/>
+                <stop offset="100%" stop-color="rgba(0,0,0,0.20)"/>
+              </radialGradient>
+              <!-- Vignette: dark corners -->
+              <radialGradient id="rg-vignette" cx="250" cy="160" r="285" gradientUnits="userSpaceOnUse">
+                <stop offset="42%" stop-color="rgba(0,0,0,0)"/>
+                <stop offset="100%" stop-color="rgba(0,0,0,0.46)"/>
+              </radialGradient>
+              <!-- Blur for player ground shadows -->
+              <filter id="f-shadow" x="-100%" y="-100%" width="300%" height="300%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="2.8"/>
+              </filter>
+              <!-- Glow for pitch lines -->
+              <filter id="f-line-glow" x="-8%" y="-8%" width="116%" height="116%">
+                <feGaussianBlur in="SourceAlpha" stdDeviation="1.4" result="blur"/>
+                <feFlood flood-color="white" flood-opacity="0.28" result="color"/>
+                <feComposite in="color" in2="blur" operator="in" result="glow"/>
+                <feMerge>
+                  <feMergeNode in="glow"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+
+            <!-- Grass: dark base + light alternating stripes -->
+            <rect width="500" height="320" fill="#176017"/>
+            <rect x="0"   y="0" width="62.5" height="320" fill="#2a8c28"/>
+            <rect x="125" y="0" width="62.5" height="320" fill="#2a8c28"/>
+            <rect x="250" y="0" width="62.5" height="320" fill="#2a8c28"/>
+            <rect x="375" y="0" width="62.5" height="320" fill="#2a8c28"/>
+
+            <!-- Pitch lines with chalk glow -->
+            <g filter="url(#f-line-glow)" stroke="rgba(255,255,255,0.92)" fill="none">
+              <rect x="15" y="15" width="470" height="290" stroke-width="2.5"/>
+              <line x1="250" y1="15" x2="250" y2="305" stroke-width="2.5"/>
+              <circle cx="250" cy="160" r="45" stroke-width="2.5"/>
+              <rect x="15"  y="95"  width="85" height="130" stroke-width="2.5"/>
+              <rect x="15"  y="125" width="32" height="70"  stroke-width="2"/>
+              <rect x="400" y="95"  width="85" height="130" stroke-width="2.5"/>
+              <rect x="453" y="125" width="32" height="70"  stroke-width="2"/>
+              <path d="M 15 27 A 12 12 0 0 1 27 15"     stroke-width="2"/>
+              <path d="M 473 15 A 12 12 0 0 1 485 27"   stroke-width="2"/>
+              <path d="M 485 293 A 12 12 0 0 1 473 305" stroke-width="2"/>
+              <path d="M 27 305 A 12 12 0 0 1 15 293"   stroke-width="2"/>
+            </g>
+
+            <!-- Goals (slightly transparent white fill) -->
+            <rect x="5"   y="133" width="10" height="54" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.70)" stroke-width="2"/>
+            <rect x="485" y="133" width="10" height="54" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.70)" stroke-width="2"/>
+
+            <!-- Spots -->
+            <circle cx="68"  cy="160" r="2.5" fill="rgba(255,255,255,0.9)"/>
+            <circle cx="432" cy="160" r="2.5" fill="rgba(255,255,255,0.9)"/>
+            <circle cx="250" cy="160" r="3.5" fill="rgba(255,255,255,0.9)"/>
+
+            <!-- Corner flags -->
+            <line x1="15" y1="15" x2="15" y2="31" stroke="rgba(255,255,255,0.55)" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M15,15 L15,25 L24,20 Z" fill="#d83030" opacity="0.9"/>
+            <line x1="485" y1="15" x2="485" y2="31" stroke="rgba(255,255,255,0.55)" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M485,15 L485,25 L476,20 Z" fill="#d83030" opacity="0.9"/>
+            <line x1="15" y1="305" x2="15" y2="289" stroke="rgba(255,255,255,0.55)" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M15,305 L15,295 L24,300 Z" fill="#d83030" opacity="0.9"/>
+            <line x1="485" y1="305" x2="485" y2="289" stroke="rgba(255,255,255,0.55)" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M485,305 L485,295 L476,300 Z" fill="#d83030" opacity="0.9"/>
+
+            <!-- Stadium lighting + vignette overlays -->
+            <rect width="500" height="320" fill="url(#rg-light)"/>
+            <rect width="500" height="320" fill="url(#rg-vignette)"/>
+
+            <!-- Players rendered by JS -->
+            <g id="pitch-players"></g>
+          </svg>
+        </div>
+        <p id="pitch-hint" class="pitch-hint">Žrijebaj timove kako bi vidio raspored igrača na terenu.</p>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="js/db.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+[
+  { "nick": "LukaB",   "role": "admin", "email": "luka.b@gmail.com"    },
+  { "nick": "Marko10", "role": "user",  "email": "marko10@gmail.com"   },
+  { "nick": "Tomo",    "role": "user",  "email": "tomo@gmail.com"      },
+  { "nick": "IvanGol", "role": "user",  "email": "ivan.gol@gmail.com"  },
+  { "nick": "JojoK",   "role": "user",  "email": "jojo.k@gmail.com"    },
+  { "nick": "Dino",    "role": "user",  "email": "dino@gmail.com"      },
+  { "nick": "Pero",    "role": "user",  "email": "pero@gmail.com"      },
+  { "nick": "Ante",    "role": "user",  "email": "ante@gmail.com"      },
+  { "nick": "Zvone",   "role": "user",  "email": "zvone@gmail.com"     },
+  { "nick": "Kreso",   "role": "user",  "email": "kreso@gmail.com"     }
+]
