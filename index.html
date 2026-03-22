@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Srijeda Nogomet</title>
   <link rel="stylesheet" href="css/style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -17,8 +18,17 @@
       </div>
       <div class="header-right">
         <span class="reg-status" id="reg-status"></span>
-        <!-- Placeholder za Google login gumb -->
-        <div class="mock-user-pill" title="Demo: klikni za promjenu korisnika" onclick="nextMockUser()">
+
+        <!-- Google user pill (prikazan kad si ulogiran) -->
+        <div class="user-pill hidden" id="google-user-pill">
+          <img class="user-pill-photo" id="google-avatar" src="" alt="">
+          <span id="google-nick"></span>
+          <span id="google-role-badge" class="role-badge role-user"></span>
+          <button class="btn-logout" onclick="doLogout()" title="Odjava">✕</button>
+        </div>
+
+        <!-- Mock user pill (za dev/testiranje) -->
+        <div class="mock-user-pill hidden" id="mock-user-pill" title="Demo: klikni za promjenu korisnika" onclick="nextMockUser()">
           <span class="mock-user-avatar" id="mock-avatar">L</span>
           <span id="mock-nick">LukaB</span>
           <span id="mock-role-badge" class="role-badge role-admin">ADMIN</span>
@@ -28,7 +38,19 @@
     </div>
   </header>
 
-  <main>
+  <!-- Login overlay -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-card">
+      <span class="login-ball">⚽</span>
+      <h2>Srijeda Nogomet</h2>
+      <p class="login-subtitle">Prijavi se za nastavak</p>
+      <div id="google-btn-container" class="google-btn-wrap"></div>
+      <p class="login-note" id="login-note"></p>
+      <button class="btn-dev-mode" onclick="enterDevMode()">Dev mode (bez prijave)</button>
+    </div>
+  </div>
+
+  <main class="hidden" id="main-content">
 
     <!-- Lijevi panel -->
     <div class="left-panel">
@@ -315,6 +337,7 @@
   </div>
 
   <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

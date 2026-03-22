@@ -8,5 +8,6 @@
   { "nick": "Pero",    "role": "user",  "email": "pero@gmail.com"      },
   { "nick": "Ante",    "role": "user",  "email": "ante@gmail.com"      },
   { "nick": "Zvone",   "role": "user",  "email": "zvone@gmail.com"     },
-  { "nick": "Kreso",   "role": "user",  "email": "kreso@gmail.com"     }
+  { "nick": "Kreso",   "role": "user",  "email": "kreso@gmail.com"     },
+  { "nick": "Josip",   "role": "admin", "email": "josip.plesa@mstart.eu"    }
 ]

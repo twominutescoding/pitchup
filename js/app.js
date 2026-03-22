@@ -6,6 +6,8 @@ const state = {
   session:     {},  // tekuća sesija — iz DB.getSession()
   players:     [],  // prijavljeni — iz DB.getPlayers()
   mockUserIdx: 0,   // koji je "korisnik" aktivan (UI simulacija, ne perzistira)
+  authMode:    null, // 'google' | 'dev'
+  googleUser:  null, // { email, name, picture }
 };
 
 // Pozicije igrača na SVG terenu (viewBox 500×320)
@@ -22,7 +24,13 @@ const POSITIONS = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function currentUser()  { return state.users[state.mockUserIdx] || state.users[0]; }
+function currentUser() {
+  if (state.authMode === 'google' && state.googleUser) {
+    const match = state.users.find(u => u.email === state.googleUser.email);
+    if (match) return match;
+  }
+  return state.users[state.mockUserIdx] || state.users[0];
+}
 function currentNick()  { return currentUser().nick; }
 function isAdmin()      { return currentUser().role === 'admin'; }
 function sessionOpen()  { return state.session.status === 'open'; }
@@ -38,14 +46,113 @@ function getActiveCount() {
 
 async function init() {
   await DB.init();
+  state.users = DB.getUsers();
 
-  state.users   = DB.getUsers();
+  // Provjeri postojeću Google sesiju
+  const existingUser = Auth.check();
+  if (existingUser) {
+    const whitelisted = state.users.find(u => u.email === existingUser.email);
+    if (whitelisted) {
+      loginWithGoogle(existingUser);
+      return;
+    }
+  }
+
+  // Nema valjane sesije → prikaži login ekran
+  showLoginScreen();
+}
+
+function showLoginScreen() {
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('main-content').classList.add('hidden');
+
+  // Inicijaliziraj Google gumb nakon što se GSI skripta učita
+  function tryInitGoogleBtn() {
+    if (typeof google !== 'undefined' && google.accounts) {
+      Auth.initGoogleButton('google-btn-container', handleGoogleLogin);
+    } else {
+      setTimeout(tryInitGoogleBtn, 200);
+    }
+  }
+  tryInitGoogleBtn();
+}
+
+function handleGoogleLogin(response) {
+  const user = Auth.handleCredential(response);
+  if (!user) {
+    document.getElementById('login-note').textContent = 'Greška pri prijavi.';
+    return;
+  }
+
+  const whitelisted = state.users.find(u => u.email === user.email);
+  if (!whitelisted) {
+    Auth.logout();
+    document.getElementById('login-note').textContent =
+      `Email ${user.email} nije na popisu igrača.`;
+    return;
+  }
+
+  loginWithGoogle(user);
+}
+
+function loginWithGoogle(googleUser) {
+  state.authMode   = 'google';
+  state.googleUser = googleUser;
+
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('main-content').classList.remove('hidden');
+
+  // Google user pill u headeru
+  const pill = document.getElementById('google-user-pill');
+  pill.classList.remove('hidden');
+  document.getElementById('google-avatar').src = googleUser.picture || '';
+  const match = state.users.find(u => u.email === googleUser.email);
+  document.getElementById('google-nick').textContent = match ? match.nick : googleUser.name;
+
+  const badge = document.getElementById('google-role-badge');
+  if (match) {
+    badge.textContent = match.role.toUpperCase();
+    badge.className   = `role-badge role-${match.role}`;
+  }
+
+  // Sakrij mock pill
+  document.getElementById('mock-user-pill').classList.add('hidden');
+
+  bootApp();
+}
+
+function enterDevMode() {
+  state.authMode = 'dev';
+
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('main-content').classList.remove('hidden');
+
+  // Prikaži mock pill, sakrij google pill
+  document.getElementById('mock-user-pill').classList.remove('hidden');
+  document.getElementById('google-user-pill').classList.add('hidden');
+
+  bootApp();
+}
+
+function doLogout() {
+  Auth.logout(); // clearsa storage i reloada
+}
+
+function bootApp() {
   state.session = DB.getSession();
   state.players = DB.getPlayers();
 
   renderNextWednesday();
   renderRegistrationStatus();
-  updateMockUserUI();
+  if (state.authMode === 'dev') updateMockUserUI();
+  else {
+    document.getElementById('admin-card').classList.toggle('hidden', !isAdmin());
+    if (isAdmin()) refreshAdminPanel();
+    document.getElementById('register-btn').disabled =
+      state.players.some(p => p.name === currentNick());
+    document.getElementById('reg-nick').textContent    = currentNick();
+    document.getElementById('reg-avatar').textContent  = currentNick().charAt(0).toUpperCase();
+  }
   updateRegCard();
   render();
   renderHistory();
