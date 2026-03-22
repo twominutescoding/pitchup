@@ -45,17 +45,25 @@ function getActiveCount() {
 // ── Init ───────────────────────────────────────────────────────────────────
 
 async function init() {
-  await DB.init();
+  try {
+    await DB.init();
+  } catch (e) {
+    console.error('DB init greška:', e);
+  }
   state.users = DB.getUsers();
 
   // Provjeri postojeću Google sesiju
-  const existingUser = Auth.check();
-  if (existingUser) {
-    const whitelisted = state.users.find(u => u.email === existingUser.email);
-    if (whitelisted) {
-      loginWithGoogle(existingUser);
-      return;
+  try {
+    const existingUser = Auth.check();
+    if (existingUser) {
+      const whitelisted = state.users.find(u => u.email === existingUser.email);
+      if (whitelisted) {
+        loginWithGoogle(existingUser);
+        return;
+      }
     }
+  } catch (e) {
+    console.error('Auth check greška:', e);
   }
 
   // Nema valjane sesije → prikaži login ekran
@@ -66,10 +74,25 @@ function showLoginScreen() {
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('main-content').classList.add('hidden');
 
-  // Inicijaliziraj Google gumb nakon što se GSI skripta učita
+  const note = document.getElementById('login-note');
+  note.textContent = '';
+
+  let attempts = 0;
+  const MAX_ATTEMPTS = 25; // 25 × 200ms = 5 sekundi
+
   function tryInitGoogleBtn() {
+    attempts++;
     if (typeof google !== 'undefined' && google.accounts) {
-      Auth.initGoogleButton('google-btn-container', handleGoogleLogin);
+      try {
+        Auth.initGoogleButton('google-btn-container', handleGoogleLogin);
+      } catch (e) {
+        console.error('GSI init greška:', e);
+        note.textContent = 'Greška pri inicijalizaciji Google prijave. Pokušaj refreshati stranicu.';
+        note.classList.add('login-error');
+      }
+    } else if (attempts >= MAX_ATTEMPTS) {
+      note.textContent = 'Google prijava se nije učitala. Provjeri internet vezu ili koristi Dev mode.';
+      note.classList.add('login-error');
     } else {
       setTimeout(tryInitGoogleBtn, 200);
     }
@@ -78,17 +101,28 @@ function showLoginScreen() {
 }
 
 function handleGoogleLogin(response) {
+  const note = document.getElementById('login-note');
+  note.textContent = '';
+  note.classList.remove('login-error');
+
+  if (!response || !response.credential) {
+    note.textContent = 'Google nije vratio podatke za prijavu. Pokušaj ponovo.';
+    note.classList.add('login-error');
+    return;
+  }
+
   const user = Auth.handleCredential(response);
   if (!user) {
-    document.getElementById('login-note').textContent = 'Greška pri prijavi.';
+    note.textContent = 'Neuspješno dekodiranje prijave. Pokušaj ponovo.';
+    note.classList.add('login-error');
     return;
   }
 
   const whitelisted = state.users.find(u => u.email === user.email);
   if (!whitelisted) {
-    Auth.logout();
-    document.getElementById('login-note').textContent =
-      `Email ${user.email} nije na popisu igrača.`;
+    Auth.clear();
+    note.innerHTML = `<strong>${user.email}</strong> nije na popisu igrača.<br>Kontaktiraj admina za pristup.`;
+    note.classList.add('login-error');
     return;
   }
 

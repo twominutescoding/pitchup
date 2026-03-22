@@ -96,9 +96,13 @@ const Auth = (() => {
       };
     },
 
+    clear() {
+      clear();
+    },
+
     logout() {
       clear();
-      google.accounts.id.disableAutoSelect();
+      try { google.accounts.id.disableAutoSelect(); } catch (_) {}
       location.reload();
     },
 
@@ -109,7 +113,8 @@ const Auth = (() => {
       google.accounts.id.initialize({
         client_id: CLIENT_ID,
         callback: callback,
-        auto_select: true,
+        auto_select: false,
+        use_fedcm_for_prompt: false,
       });
       google.accounts.id.renderButton(
         document.getElementById(containerId),
@@ -121,7 +126,7 @@ const Auth = (() => {
           width: 280,
         }
       );
-      google.accounts.id.prompt();
+      // Samo renderani gumb, bez One Tap prompt-a (izaziva origin_mismatch nakon logoutа)
     },
   };
 

@@ -236,9 +236,18 @@ h1 {
 
 .login-note {
   font-size: 0.78rem;
-  color: #e06060;
+  color: var(--muted);
   min-height: 20px;
   margin-bottom: 16px;
+  line-height: 1.4;
+  text-align: center;
+}
+.login-note.login-error {
+  color: #e06060;
+  background: rgba(224, 96, 96, 0.1);
+  border: 1px solid rgba(224, 96, 96, 0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
 }
 
 .btn-dev-mode {
