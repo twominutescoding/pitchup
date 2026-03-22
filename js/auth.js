@@ -121,6 +121,7 @@ const Auth = (() => {
           width: 280,
         }
       );
+      google.accounts.id.prompt();
     },
   };
 
