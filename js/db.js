@@ -18,6 +18,7 @@ const DB = (() => {
     session: 'nfg_session',
     players: 'nfg_players',
     history: 'nfg_history',
+    ratings: 'nfg_ratings',
   };
 
   // Fallback seed podaci — koriste se kad fetch ne radi (file:// protokol)
@@ -110,6 +111,9 @@ const DB = (() => {
       if (!load(KEYS.players)) {
         save(KEYS.players, []);
       }
+      if (!load(KEYS.ratings)) {
+        save(KEYS.ratings, []);
+      }
     },
 
     // ── Getteri ────────────────────────────────────────────────────────────
@@ -118,6 +122,7 @@ const DB = (() => {
     getSession() { return load(KEYS.session) ?? { ...DEFAULT_SESSION }; },
     getPlayers() { return load(KEYS.players) ?? []; },
     getHistory() { return load(KEYS.history) ?? []; },
+    getRatings() { return load(KEYS.ratings) ?? []; },
 
     // ── Setteri ────────────────────────────────────────────────────────────
 
@@ -129,6 +134,31 @@ const DB = (() => {
       history.unshift(result);
       save(KEYS.history, history);
       return history;
+    },
+
+    addRating(rating) {
+      const ratings = this.getRatings();
+      ratings.push(rating);
+      save(KEYS.ratings, ratings);
+    },
+
+    hasRated(matchDate, rater, rated) {
+      return this.getRatings().some(r =>
+        r.matchDate === matchDate && r.rater === rater && r.rated === rated
+      );
+    },
+
+    getPlayerAvgRatings(playerName) {
+      const all = this.getRatings().filter(r => r.rated === playerName);
+      if (!all.length) return null;
+      const cats = ['tehnika', 'brzina', 'izdrzljivost', 'timska', 'pozicioniranje'];
+      const avgs = {};
+      cats.forEach(c => {
+        const vals = all.map(r => r.scores[c]).filter(v => v != null);
+        avgs[c] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+      });
+      avgs._count = all.length;
+      return avgs;
     },
 
     // ── Dev alat: resetira sve na seed podatke ─────────────────────────────

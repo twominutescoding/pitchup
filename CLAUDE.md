@@ -4,46 +4,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A static HTML/CSS/JS web app for organizing Wednesday amateur football (soccer) games. Deployed on GitHub Pages with no backend — Google Sheets acts as the database (mocked with local JSON during development).
+A static HTML/CSS/JS web app for organizing Wednesday amateur football (soccer) games. The UI is in Croatian. Deployed on GitHub Pages — no backend, no build step, no bundler.
 
 ## Running the Project
 
-Open `index.html` directly in a browser. No build step or server needed.
+Open `index.html` directly in a browser (`file://` works). No server, build, lint, or test commands exist.
+
+To reset app state during development, run `DB.reset()` in the browser console.
 
 ## Architecture
 
-**Single-page static app** — everything lives in `index.html` (or split into `index.html` + `style.css` + `app.js` as it grows).
+**Single-page app with two-panel layout**: left panel has registration, player list, admin controls, and match history; right panel renders an SVG football pitch with player positions.
 
-**Data layer** (current: mock JSON → future: Google Sheets API):
-- `data/players.json` — registered players for current week
-- `data/sessions.json` — available time slots and fields
-- Google Sheets replaces JSON files later; each sheet = DB table
+**Three source files loaded in order** (no modules, no bundler):
+1. `js/db.js` — `DB` singleton (IIFE). Persistence layer using `localStorage` with keys prefixed `nfg_`. On first load, seeds from `data/users.json` and `data/history.json` (falls back to hardcoded seed data when fetch fails, e.g. `file://` protocol). Designed to be swapped for Google Sheets API later — all reads/writes go through `DB.getX()` / `DB.saveX()`.
+2. `js/app.js` — All application logic and rendering. Global `state` object holds `users`, `session`, `players`, `mockUserIdx`. No framework — DOM manipulation via `document.getElementById` and `innerHTML`.
+3. `css/style.css` — All styles.
 
-**Key modules to implement (JavaScript)**:
-- `registration.js` — player sign-up (Sun–Wed window), visible to all
-- `teams.js` — random team assignment when 8 or 10 players registered; random marker team assignment
-- `field.js` — HTML5 Canvas rendering of football pitch with player circles and names
+**Data flow**: `DB.init()` → populate `state` from `DB` getters → `render()` updates DOM. User actions mutate `state`, call `DB.saveX()`, then re-render.
+
+**Mock auth**: No real auth yet. A clickable "demo" pill in the header cycles through users from `data/users.json`. The first user (`LukaB`) has `role: "admin"`. Admin-only features (open/close session, draw teams, record results) check `isAdmin()`.
+
+**Pitch rendering**: SVG-based (not Canvas), with `viewBox="0 0 500 320"`. Player positions are defined in the `POSITIONS` constant (4v4 and 5v5 formations). Players are drawn as gradient spheres with name labels via `drawPlayerMarker()` into the `#pitch-players` group.
 
 ## Core Business Rules
 
-- Registration opens Sunday, closes Wednesday
-- Default field: **Velesajam dvojka**; default time: **19:00–20:00**
-- Player counts: **8** (4v4) or **10** (5v5) — team draw triggers at these thresholds
+- Admin opens/closes registration per session (no automatic Sunday–Wednesday window yet)
+- Default field: **Velesajam 2**; default time: **19–20h**
+- Team draw available when **8+** players registered; uses first 8 (4v4) or 10 (5v5) players, extras go to bench
+- Adding a player after teams are drawn resets the draw
 - One team randomly assigned to bring markers (bibs)
-- Future: Google OAuth login; only emails whitelisted in Google Sheets can access
+- Match results are stored in history with both team rosters
 
 ## Original Requirements (Croatian)
 
-Stanica će služiti za nogomet srijedom za amaterske ekipe. Na stranicu se mogu prijavljivati ljudi i počinje od nedjelje i traje do srijede. Popis ljudi biti će u google docsima i popis termina također. Dok se ne uspostave google docsi imati ćemo mockane jsone. Biti će jedan google excel sa više sheetova. Sheetovi će služiti kao DB tablice. Aplikacija će biti deployana na git pages kao statički resurs. Stranica treba biti u nogometnom duhu i bilo bi dobro da se doda html 5 sadržaj zbog efektnosti.
-
-Funkcionalnosti: odabir terena za tekuću srijedu: default Velesajam dvojka
-Odabir termina: default je od 19-20h
-Mogući broj ljudi je 8 ili 10 za sada, odnosno 4vs4 ili 5vs5
-
-Ljudi se mogu prijavljivati i to je vidljivo svakome
-Kada se skupi 8 ili 10 igrača moguće je napraviti random dodjeljivanje tima
-Također jedan tim nosi markere, drugi ne nosi i to je random određeno.
-
-Kasnije bi trebali dodati i login pomoću google-a i samo ljudi čije email adrese su u google sheetsima mogu pristupiti aplikaciji.
-
-Za sada je ovo koncept. Treba najprije napraviti cijeli dizanj, pa onda krenuti sa funkcionalnostima. U svakom slučaju negdje mora biti prikazan nogomenti teren i u njemu nacrtani kružići sa imenima igrača kada se podjele u timove.
+Stranica za nogomet srijedom za amaterske ekipe. Prijave od nedjelje do srijede. Popis ljudi i termina u Google Sheetsima (mockano JSONom za sada). Deploy na GitHub Pages. Default teren: Velesajam dvojka, default termin: 19-20h. Mogući broj igrača: 8 (4v4) ili 10 (5v5). Random podjela timova i random odabir tima koji nosi markere. Prikaz nogometnog terena s kružićima i imenima igrača. Budući login preko Google OAutha s whitelistom emailova.

@@ -156,7 +156,7 @@ h1 {
 /* ── Main layout ──────────────────────────────────────── */
 main {
   display: grid;
-  grid-template-columns: 310px 1fr;
+  grid-template-columns: 310px minmax(0, 1fr);
   gap: 14px;
   padding: 14px;
   height: calc(100vh - var(--header-h));
@@ -187,6 +187,13 @@ main {
   overflow-y: auto;
   min-height: 0;
 }
+
+/* Custom scrollbar (dark theme) */
+.left-panel::-webkit-scrollbar       { width: 6px; }
+.left-panel::-webkit-scrollbar-track  { background: transparent; }
+.left-panel::-webkit-scrollbar-thumb  { background: var(--border-hl); border-radius: 3px; }
+.left-panel::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+.left-panel { scrollbar-width: thin; scrollbar-color: var(--border-hl) transparent; }
 
 /* ── Session bar ──────────────────────────────────────── */
 .session-bar {
@@ -479,12 +486,28 @@ main {
   white-space: nowrap;
 }
 
+.player-rating {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--gold-hl);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.player-rating:hover { opacity: 0.75; }
+
 .player-team-tag {
   margin-left: auto;
   font-size: 0.68rem;
   font-weight: 700;
   color: var(--muted);
   flex-shrink: 0;
+}
+
+/* Kad postoji i rating i team tag, rating ne gura tag */
+.player-chip .player-rating + .player-team-tag {
+  margin-left: 6px;
 }
 
 .empty-state {
@@ -637,31 +660,33 @@ main {
 .btn-admin:hover { border-color: var(--border-hl); background: #0d1a0d; }
 
 /* Result form */
-.result-form {
+.result-labels {
   display: flex;
-  align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
-
-.result-side {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-}
-.result-side-b { flex-direction: column; }
 
 .result-team-name {
   font-size: 0.68rem;
   color: var(--muted);
   font-weight: 600;
-  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 100%;
+  min-width: 0;
+  flex: 1;
+}
+.result-team-name:last-child {
+  text-align: right;
+}
+
+.result-form {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
 .score-input {
@@ -687,7 +712,6 @@ main {
   font-weight: 800;
   color: var(--muted);
   flex-shrink: 0;
-  margin-top: 16px;
 }
 
 .btn-save-result {
@@ -782,6 +806,461 @@ main {
 .history-outcome.win-a,
 .history-outcome.win-b { color: var(--green-hl); }
 .history-outcome.draw   { color: var(--muted); }
+
+/* "Svi rezultati" link button */
+.btn-history-all {
+  background: none;
+  border: none;
+  color: var(--green-hl);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.btn-history-all:hover { background: rgba(48,147,58,0.12); }
+
+/* ── History tab (full overlay) ──────────────────────── */
+.history-tab {
+  z-index: 200; /* below rating/profile overlays */
+}
+
+.history-tab-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.history-tab-header h2 {
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.btn-back {
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.btn-back:hover { border-color: var(--border-hl); background: #0d1a0d; }
+
+/* Full history match card */
+.hf-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.hf-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.hf-date {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: capitalize;
+}
+
+.hf-venue {
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.hf-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 6px;
+}
+
+.hf-team-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  min-width: 50px;
+}
+.hf-team-label:first-child { text-align: right; }
+.hf-team-label:last-child  { text-align: left; }
+.hf-team-label.hf-winner   { color: var(--text); }
+
+.hf-score {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: 2px;
+  white-space: nowrap;
+}
+
+.hf-outcome {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 12px;
+}
+.hf-outcome.win-a,
+.hf-outcome.win-b { color: var(--green-hl); }
+.hf-outcome.draw  { color: var(--muted); }
+
+.hf-rosters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.hf-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hf-roster-right {
+  text-align: right;
+}
+
+.hf-player {
+  font-size: 0.78rem;
+  color: var(--text);
+  opacity: 0.85;
+}
+
+/* ── Stats table ─────────────────────────────────────── */
+.stats-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.stats-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.stats-table th {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+
+.stats-table td {
+  padding: 8px 4px;
+  border-bottom: 1px solid rgba(26,54,26,0.5);
+  text-align: center;
+  color: var(--text);
+}
+
+.stats-table tr:last-child td { border-bottom: none; }
+
+.st-pos {
+  width: 28px;
+  color: var(--muted);
+  text-align: center !important;
+}
+
+.st-name {
+  text-align: left !important;
+  font-weight: 600;
+}
+
+.st-num {
+  width: 36px;
+}
+
+.st-pts {
+  font-weight: 800;
+  color: var(--gold-hl) !important;
+}
+
+.st-first .st-name {
+  color: var(--gold-hl);
+}
+
+.st-first .st-pos {
+  color: var(--gold-hl);
+}
+
+/* ── Shared overlay (reusable for rating + profile) ──── */
+.overlay-tab {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  background: var(--bg);
+  display: flex;
+  justify-content: center;
+  overflow-y: auto;
+}
+.overlay-tab::-webkit-scrollbar       { width: 6px; }
+.overlay-tab::-webkit-scrollbar-track  { background: transparent; }
+.overlay-tab::-webkit-scrollbar-thumb  { background: var(--border-hl); border-radius: 3px; }
+.overlay-tab { scrollbar-width: thin; scrollbar-color: var(--border-hl) transparent; }
+
+.overlay-tab-inner {
+  width: 100%;
+  max-width: 600px;
+  padding: 24px 20px 40px;
+}
+
+/* Clickable elements */
+.clickable { cursor: pointer; }
+.clickable:hover { color: var(--green-hl) !important; }
+
+/* "Ocijeni igrače" button on match cards */
+.btn-rate-match {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.btn-rate-match:hover { border-color: var(--gold); color: var(--gold-hl); }
+
+/* ── Rating modal ────────────────────────────────────── */
+.rate-player-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+
+.rpc-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rpc-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #d8ecd8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.rpc-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.rpc-done {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--green-hl);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rpc-cats {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.rpc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+}
+
+.rpc-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 600;
+  min-width: 100px;
+}
+
+.star-row {
+  display: flex;
+  gap: 4px;
+}
+
+.star {
+  font-size: 1.3rem;
+  color: var(--border);
+  cursor: pointer;
+  transition: color 0.12s, transform 0.1s;
+  user-select: none;
+  line-height: 1;
+}
+.star:hover { transform: scale(1.2); }
+.star.active { color: var(--gold-hl); }
+
+.btn-rate-submit {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  background: var(--green);
+  color: #d8ecd8;
+  border: none;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-rate-submit:hover { background: var(--green-hl); }
+
+.rate-note {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  min-height: 14px;
+}
+.rate-note.error   { color: #e06060; }
+.rate-note.success { color: #5ec05e; }
+
+/* ── Player profile ──────────────────────────────────── */
+.prof-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.prof-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.prof-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #d8ecd8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.prof-name {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.prof-meta {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.prof-radar-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.radar-svg {
+  width: 240px;
+  height: 240px;
+}
+
+.prof-stats {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.prof-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.prof-stat-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  min-width: 100px;
+}
+
+.prof-stat-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.prof-stat-bar {
+  height: 100%;
+  background: var(--green-hl);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.prof-stat-val {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text);
+  min-width: 28px;
+  text-align: right;
+}
 
 /* ── Right panel / pitch ──────────────────────────────── */
 .right-panel {

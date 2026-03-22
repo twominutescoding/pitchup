@@ -379,6 +379,19 @@ function renderPlayers() {
     chip.appendChild(av);
     chip.appendChild(nm);
 
+    // Prosječna ocjena
+    const avgData = DB.getPlayerAvgRatings(player.name);
+    if (avgData) {
+      const cats = ['tehnika', 'brzina', 'izdrzljivost', 'timska', 'pozicioniranje'];
+      const overall = cats.reduce((s, c) => s + (avgData[c] || 0), 0) / cats.length;
+      const rating = document.createElement('span');
+      rating.className = 'player-rating clickable';
+      rating.textContent = `★ ${overall.toFixed(1)}`;
+      rating.title = 'Pogledaj profil';
+      rating.onclick = (e) => { e.stopPropagation(); openPlayerProfile(player.name); };
+      chip.appendChild(rating);
+    }
+
     if (player.team && !onBench) {
       const tag = document.createElement('span');
       tag.className   = 'player-team-tag';
@@ -503,39 +516,366 @@ function drawPlayerMarker(container, player, x, y, gradId) {
 
 // ── History ────────────────────────────────────────────────────────────────
 
+function historyItemCompact(m) {
+  const date     = new Date(m.date).toLocaleDateString('hr-HR', { day: 'numeric', month: 'numeric', year: 'numeric' });
+  const diff     = m.scoreA - m.scoreB;
+  const outcome  = diff > 0 ? 'win-a' : diff < 0 ? 'win-b' : 'draw';
+  const label    = diff > 0 ? 'Tim A pobijedio' : diff < 0 ? 'Tim B pobijedio' : 'Neriješeno';
+  const playersA = (m.teamA || []).join(', ') || '—';
+  const playersB = (m.teamB || []).join(', ') || '—';
+  return `
+    <div class="history-item">
+      <div class="history-meta">${date} · ${m.field} · ${m.time}</div>
+      <div class="history-score">
+        <div class="hs-side">
+          <span class="hs-team ${outcome === 'win-a' ? 'hs-winner' : ''}">Tim A</span>
+          <span class="hs-players">${playersA}</span>
+        </div>
+        <span class="hs-num">${m.scoreA} – ${m.scoreB}</span>
+        <div class="hs-side hs-side-right">
+          <span class="hs-team ${outcome === 'win-b' ? 'hs-winner' : ''}">Tim B</span>
+          <span class="hs-players">${playersB}</span>
+        </div>
+      </div>
+      <div class="history-outcome ${outcome}">${label}</div>
+    </div>`;
+}
+
+function historyItemFull(m) {
+  const date     = new Date(m.date).toLocaleDateString('hr-HR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const diff     = m.scoreA - m.scoreB;
+  const outcome  = diff > 0 ? 'win-a' : diff < 0 ? 'win-b' : 'draw';
+  const label    = diff > 0 ? 'Tim A pobijedio' : diff < 0 ? 'Tim B pobijedio' : 'Neriješeno';
+  const teamA    = (m.teamA || []);
+  const teamB    = (m.teamB || []);
+  return `
+    <div class="hf-card">
+      <div class="hf-header">
+        <span class="hf-date">${date}</span>
+        <span class="hf-venue">${m.field} · ${m.time}</span>
+      </div>
+      <div class="hf-score-row">
+        <span class="hf-team-label ${outcome === 'win-a' ? 'hf-winner' : ''}">Tim A</span>
+        <span class="hf-score">${m.scoreA} – ${m.scoreB}</span>
+        <span class="hf-team-label ${outcome === 'win-b' ? 'hf-winner' : ''}">Tim B</span>
+      </div>
+      <div class="hf-outcome ${outcome}">${label}</div>
+      <div class="hf-rosters">
+        <div class="hf-roster">
+          ${teamA.map(n => `<span class="hf-player clickable" onclick="openPlayerProfile('${n}')">${n}</span>`).join('')}
+        </div>
+        <div class="hf-roster hf-roster-right">
+          ${teamB.map(n => `<span class="hf-player clickable" onclick="openPlayerProfile('${n}')">${n}</span>`).join('')}
+        </div>
+      </div>
+      <button class="btn-rate-match" onclick="openRatingModal('${m.date}')">⭐ Ocijeni igrače</button>
+    </div>`;
+}
+
 function renderHistory() {
   const list    = document.getElementById('history-list');
+  const allBtn  = document.getElementById('btn-history-all');
   const history = DB.getHistory();
 
   if (!history.length) {
     list.innerHTML = '<div class="empty-state">Nema zapisanih rezultata.</div>';
+    allBtn.classList.add('hidden');
     return;
   }
 
-  list.innerHTML = history.map(m => {
-    const date     = new Date(m.date).toLocaleDateString('hr-HR', { day: 'numeric', month: 'numeric', year: 'numeric' });
-    const diff     = m.scoreA - m.scoreB;
-    const outcome  = diff > 0 ? 'win-a' : diff < 0 ? 'win-b' : 'draw';
-    const label    = diff > 0 ? 'Tim A pobijedio' : diff < 0 ? 'Tim B pobijedio' : 'Neriješeno';
-    const playersA = (m.teamA || []).join(', ') || '—';
-    const playersB = (m.teamB || []).join(', ') || '—';
+  allBtn.classList.remove('hidden');
+  list.innerHTML = history.slice(0, 3).map(historyItemCompact).join('');
+}
+
+// ── History tab (full view) ───────────────────────────────────────────────
+
+function calcPlayerStats(history) {
+  const stats = {};
+  history.forEach(m => {
+    const diff = m.scoreA - m.scoreB;
+    (m.teamA || []).forEach(name => {
+      if (!stats[name]) stats[name] = { w: 0, d: 0, l: 0, gp: 0 };
+      stats[name].gp++;
+      if (diff > 0) stats[name].w++;
+      else if (diff === 0) stats[name].d++;
+      else stats[name].l++;
+    });
+    (m.teamB || []).forEach(name => {
+      if (!stats[name]) stats[name] = { w: 0, d: 0, l: 0, gp: 0 };
+      stats[name].gp++;
+      if (diff < 0) stats[name].w++;
+      else if (diff === 0) stats[name].d++;
+      else stats[name].l++;
+    });
+  });
+  return Object.entries(stats)
+    .map(([name, s]) => ({ name, ...s, pts: s.w * 3 + s.d }))
+    .sort((a, b) => b.pts - a.pts || b.w - a.w || b.gp - a.gp);
+}
+
+function renderStatsTable(history) {
+  const rows = calcPlayerStats(history);
+  if (!rows.length) return '';
+  return `
+    <div class="stats-card">
+      <div class="stats-title">Poredak igrača</div>
+      <table class="stats-table">
+        <thead>
+          <tr>
+            <th class="st-pos">#</th>
+            <th class="st-name">Igrač</th>
+            <th class="st-num">W</th>
+            <th class="st-num">D</th>
+            <th class="st-num">L</th>
+            <th class="st-num">GP</th>
+            <th class="st-num st-pts">Bod</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((r, i) => `
+            <tr${i === 0 ? ' class="st-first"' : ''}>
+              <td class="st-pos">${i + 1}.</td>
+              <td class="st-name clickable" onclick="openPlayerProfile('${r.name}')">${r.name}</td>
+              <td class="st-num">${r.w}</td>
+              <td class="st-num">${r.d}</td>
+              <td class="st-num">${r.l}</td>
+              <td class="st-num">${r.gp}</td>
+              <td class="st-num st-pts">${r.pts}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function showHistoryTab() {
+  const history = DB.getHistory();
+  const list    = document.getElementById('history-full-list');
+  if (!history.length) {
+    list.innerHTML = '<div class="empty-state">Nema zapisanih rezultata.</div>';
+  } else {
+    list.innerHTML = renderStatsTable(history) +
+      '<div class="stats-title" style="margin-top:24px;margin-bottom:12px;">Sve utakmice</div>' +
+      history.map(historyItemFull).join('');
+  }
+  document.getElementById('history-tab').classList.remove('hidden');
+}
+
+function hideHistoryTab() {
+  document.getElementById('history-tab').classList.add('hidden');
+}
+
+// ── Rating categories ─────────────────────────────────────────────────────
+
+const RATING_CATS = [
+  { key: 'tehnika',        label: 'Tehnika' },
+  { key: 'brzina',         label: 'Brzina' },
+  { key: 'izdrzljivost',   label: 'Izdržljivost' },
+  { key: 'timska',         label: 'Timska igra' },
+  { key: 'pozicioniranje', label: 'Pozicioniranje' },
+];
+
+// ── Rating modal ──────────────────────────────────────────────────────────
+
+let _ratingMatch = null; // { date, allPlayers[] }
+
+function openRatingModal(matchDate) {
+  const history = DB.getHistory();
+  const match   = history.find(m => m.date === matchDate);
+  if (!match) return;
+
+  const allPlayers = [...(match.teamA || []), ...(match.teamB || [])];
+  const me = currentNick();
+  if (!allPlayers.includes(me)) {
+    alert('Nisi sudjelovao u ovoj utakmici.');
+    return;
+  }
+
+  _ratingMatch = { date: matchDate, allPlayers };
+  const others = allPlayers.filter(n => n !== me);
+
+  const body = document.getElementById('rating-modal-body');
+  body.innerHTML = others.map(name => {
+    const alreadyRated = DB.hasRated(matchDate, me, name);
     return `
-      <div class="history-item">
-        <div class="history-meta">${date} · ${m.field} · ${m.time}</div>
-        <div class="history-score">
-          <div class="hs-side">
-            <span class="hs-team ${outcome === 'win-a' ? 'hs-winner' : ''}">Tim A</span>
-            <span class="hs-players">${playersA}</span>
-          </div>
-          <span class="hs-num">${m.scoreA} – ${m.scoreB}</span>
-          <div class="hs-side hs-side-right">
-            <span class="hs-team ${outcome === 'win-b' ? 'hs-winner' : ''}">Tim B</span>
-            <span class="hs-players">${playersB}</span>
-          </div>
+      <div class="rate-player-card" id="rpc-${name}">
+        <div class="rpc-header">
+          <div class="rpc-avatar">${name.charAt(0).toUpperCase()}</div>
+          <span class="rpc-name">${name}</span>
+          ${alreadyRated ? '<span class="rpc-done">Ocijenjeno</span>' : ''}
         </div>
-        <div class="history-outcome ${outcome}">${label}</div>
+        ${alreadyRated ? '' : renderStarInputs(name)}
       </div>`;
   }).join('');
+
+  document.getElementById('rating-modal').classList.remove('hidden');
+}
+
+function renderStarInputs(playerName) {
+  return `<div class="rpc-cats">
+    ${RATING_CATS.map(c => `
+      <div class="rpc-row">
+        <span class="rpc-label">${c.label}</span>
+        <div class="star-row" data-player="${playerName}" data-cat="${c.key}">
+          ${[1,2,3,4,5].map(v => `<span class="star" data-val="${v}" onclick="pickStar(this)">★</span>`).join('')}
+        </div>
+      </div>`).join('')}
+    <button class="btn-rate-submit" onclick="submitPlayerRating('${playerName}')">Spremi ocjenu</button>
+    <p class="rate-note" id="rate-note-${playerName}"></p>
+  </div>`;
+}
+
+function pickStar(el) {
+  const row = el.parentElement;
+  const val = parseInt(el.dataset.val);
+  row.querySelectorAll('.star').forEach(s => {
+    s.classList.toggle('active', parseInt(s.dataset.val) <= val);
+  });
+  row.dataset.selected = val;
+}
+
+function submitPlayerRating(playerName) {
+  if (!_ratingMatch) return;
+  const me = currentNick();
+  if (DB.hasRated(_ratingMatch.date, me, playerName)) return;
+
+  const scores = {};
+  let allFilled = true;
+  RATING_CATS.forEach(c => {
+    const row = document.querySelector(`.star-row[data-player="${playerName}"][data-cat="${c.key}"]`);
+    const val = parseInt(row?.dataset.selected);
+    if (!val) allFilled = false;
+    scores[c.key] = val || 0;
+  });
+
+  if (!allFilled) {
+    const note = document.getElementById(`rate-note-${playerName}`);
+    note.textContent = 'Odaberi ocjenu za svaku kategoriju.';
+    note.className = 'rate-note error';
+    return;
+  }
+
+  DB.addRating({
+    matchDate: _ratingMatch.date,
+    rater: me,
+    rated: playerName,
+    scores,
+  });
+
+  // Replace card with "done" state
+  const card = document.getElementById(`rpc-${playerName}`);
+  card.innerHTML = `
+    <div class="rpc-header">
+      <div class="rpc-avatar">${playerName.charAt(0).toUpperCase()}</div>
+      <span class="rpc-name">${playerName}</span>
+      <span class="rpc-done">Ocijenjeno</span>
+    </div>`;
+}
+
+function closeRatingModal() {
+  document.getElementById('rating-modal').classList.add('hidden');
+  _ratingMatch = null;
+}
+
+// ── Player profile with radar chart ───────────────────────────────────────
+
+function openPlayerProfile(playerName) {
+  const avgs = DB.getPlayerAvgRatings(playerName);
+  const body = document.getElementById('profile-body');
+  document.getElementById('profile-title').textContent = playerName;
+
+  if (!avgs) {
+    body.innerHTML = '<div class="empty-state">Nema ocjena za ovog igrača.</div>';
+    document.getElementById('player-profile').classList.remove('hidden');
+    return;
+  }
+
+  const radarSvg = renderRadarChart(avgs);
+  const catRows  = RATING_CATS.map(c =>
+    `<div class="prof-stat-row">
+      <span class="prof-stat-label">${c.label}</span>
+      <div class="prof-stat-bar-wrap">
+        <div class="prof-stat-bar" style="width:${(avgs[c.key] / 5) * 100}%"></div>
+      </div>
+      <span class="prof-stat-val">${avgs[c.key].toFixed(1)}</span>
+    </div>`
+  ).join('');
+
+  body.innerHTML = `
+    <div class="prof-card">
+      <div class="prof-header">
+        <div class="prof-avatar">${playerName.charAt(0).toUpperCase()}</div>
+        <div class="prof-info">
+          <div class="prof-name">${playerName}</div>
+          <div class="prof-meta">${avgs._count} ocjen${avgs._count === 1 ? 'a' : avgs._count < 5 ? 'e' : 'a'}</div>
+        </div>
+      </div>
+      <div class="prof-radar-wrap">${radarSvg}</div>
+      <div class="prof-stats">${catRows}</div>
+    </div>`;
+
+  document.getElementById('player-profile').classList.remove('hidden');
+}
+
+function closePlayerProfile() {
+  document.getElementById('player-profile').classList.add('hidden');
+}
+
+function renderRadarChart(avgs) {
+  const size = 240, cx = size / 2, cy = size / 2, R = 90;
+  const cats = RATING_CATS;
+  const n = cats.length;
+
+  // Compute polygon points for each ring (1–5)
+  function polyPoints(radius) {
+    return cats.map((_, i) => {
+      const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
+      return `${cx + radius * Math.cos(angle)},${cy + radius * Math.sin(angle)}`;
+    }).join(' ');
+  }
+
+  // Grid rings
+  const rings = [1,2,3,4,5].map(v => {
+    const r = (v / 5) * R;
+    return `<polygon points="${polyPoints(r)}" fill="none" stroke="rgba(94,138,94,${v === 5 ? 0.4 : 0.15})" stroke-width="${v === 5 ? 1.5 : 1}"/>`;
+  }).join('');
+
+  // Axis lines
+  const axes = cats.map((_, i) => {
+    const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
+    const x2 = cx + R * Math.cos(angle);
+    const y2 = cy + R * Math.sin(angle);
+    return `<line x1="${cx}" y1="${cy}" x2="${x2}" y2="${y2}" stroke="rgba(94,138,94,0.2)" stroke-width="1"/>`;
+  }).join('');
+
+  // Data polygon
+  const dataPoints = cats.map((c, i) => {
+    const val   = avgs[c.key] || 0;
+    const r     = (val / 5) * R;
+    const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
+    return `${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`;
+  }).join(' ');
+
+  // Labels
+  const labels = cats.map((c, i) => {
+    const angle  = (i / n) * 2 * Math.PI - Math.PI / 2;
+    const lr     = R + 18;
+    const lx     = cx + lr * Math.cos(angle);
+    const ly     = cy + lr * Math.sin(angle);
+    const anchor = Math.abs(Math.cos(angle)) < 0.1 ? 'middle' : Math.cos(angle) > 0 ? 'start' : 'end';
+    return `<text x="${lx}" y="${ly + 4}" text-anchor="${anchor}" fill="#5e8a5e" font-size="9" font-weight="600">${c.label}</text>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${size} ${size}" class="radar-svg">
+    ${rings}${axes}
+    <polygon points="${dataPoints}" fill="rgba(48,147,58,0.25)" stroke="#30933a" stroke-width="2"/>
+    ${cats.map((c, i) => {
+      const val   = avgs[c.key] || 0;
+      const r     = (val / 5) * R;
+      const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
+      return `<circle cx="${cx + r * Math.cos(angle)}" cy="${cy + r * Math.sin(angle)}" r="3.5" fill="#30933a" stroke="#d8ecd8" stroke-width="1.5"/>`;
+    }).join('')}
+    ${labels}
+  </svg>`;
 }
 
 // ── Utils ──────────────────────────────────────────────────────────────────

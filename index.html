@@ -148,16 +148,14 @@
           <!-- Upiši rezultat -->
           <div class="admin-section">
             <label class="admin-label">Upiši rezultat</label>
+            <div class="result-labels">
+              <span class="result-team-name" id="result-label-a">Tim A</span>
+              <span class="result-team-name" id="result-label-b">Tim B</span>
+            </div>
             <div class="result-form">
-              <div class="result-side">
-                <span class="result-team-name" id="result-label-a">Tim A</span>
-                <input type="number" id="score-a" class="score-input" value="0" min="0" max="99">
-              </div>
+              <input type="number" id="score-a" class="score-input" value="0" min="0" max="99">
               <span class="result-dash">–</span>
-              <div class="result-side result-side-b">
-                <input type="number" id="score-b" class="score-input" value="0" min="0" max="99">
-                <span class="result-team-name" id="result-label-b">Tim B</span>
-              </div>
+              <input type="number" id="score-b" class="score-input" value="0" min="0" max="99">
             </div>
             <button class="btn-save-result" onclick="submitResult()">Spremi rezultat</button>
             <p class="admin-note" id="result-note"></p>
@@ -166,10 +164,13 @@
         </div><!-- /admin-actions -->
       </div>
 
-      <!-- Povijest rezultata -->
+      <!-- Povijest rezultata (zadnja 3) -->
       <div class="card history-card">
-        <div class="players-title" style="margin-bottom:10px;">
-          <span class="section-label">📋 Rezultati</span>
+        <div class="players-header">
+          <div class="players-title">
+            <span class="section-label">📋 Rezultati</span>
+          </div>
+          <button class="btn-history-all" id="btn-history-all" onclick="showHistoryTab()">Svi rezultati →</button>
         </div>
         <div id="history-list"></div>
       </div>
@@ -279,6 +280,39 @@
     </div>
 
   </main>
+
+  <!-- Overlay: svi rezultati -->
+  <div id="history-tab" class="history-tab overlay-tab hidden">
+    <div class="overlay-tab-inner">
+      <div class="history-tab-header">
+        <button class="btn-back" onclick="hideHistoryTab()">← Natrag</button>
+        <h2>Svi rezultati</h2>
+      </div>
+      <div id="history-full-list" class="history-full-list"></div>
+    </div>
+  </div>
+
+  <!-- Overlay: ocjenjivanje igrača za utakmicu -->
+  <div id="rating-modal" class="overlay-tab hidden">
+    <div class="overlay-tab-inner">
+      <div class="history-tab-header">
+        <button class="btn-back" onclick="closeRatingModal()">← Natrag</button>
+        <h2 id="rating-modal-title">Ocijeni igrače</h2>
+      </div>
+      <div id="rating-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Overlay: profil igrača -->
+  <div id="player-profile" class="overlay-tab hidden">
+    <div class="overlay-tab-inner">
+      <div class="history-tab-header">
+        <button class="btn-back" onclick="closePlayerProfile()">← Natrag</button>
+        <h2 id="profile-title">Profil igrača</h2>
+      </div>
+      <div id="profile-body"></div>
+    </div>
+  </div>
 
   <script src="js/db.js"></script>
   <script src="js/app.js"></script>
