@@ -368,18 +368,10 @@ function renderPlayers() {
       onBench ? 'bench' : '',
     ].filter(Boolean).join(' ');
 
-    const av = document.createElement('div');
-    av.className   = 'player-avatar';
-    av.textContent = player.name.charAt(0).toUpperCase();
+    // Gornji red: badges (tim, ocjena, forma)
+    const topRow = document.createElement('div');
+    topRow.className = 'chip-top';
 
-    const nm = document.createElement('span');
-    nm.className   = 'player-name';
-    nm.textContent = player.name;
-
-    chip.appendChild(av);
-    chip.appendChild(nm);
-
-    // Prosječna ocjena
     const avgData = DB.getPlayerAvgRatings(player.name);
     if (avgData) {
       const cats = ['tehnika', 'brzina', 'izdrzljivost', 'timska', 'pozicioniranje'];
@@ -389,21 +381,35 @@ function renderPlayers() {
       rating.textContent = `★ ${overall.toFixed(1)}`;
       rating.title = 'Pogledaj profil';
       rating.onclick = (e) => { e.stopPropagation(); openPlayerProfile(player.name); };
-      chip.appendChild(rating);
+      topRow.appendChild(rating);
     }
 
-    if (player.team && !onBench) {
-      const tag = document.createElement('span');
-      tag.className   = 'player-team-tag';
-      tag.textContent = player.team.toUpperCase();
-      chip.appendChild(tag);
+    const pForm = calcPlayerForm(player.name);
+    if (pForm > 1) {
+      const fm = document.createElement('span');
+      fm.className = 'player-form';
+      fm.textContent = formIcon(pForm);
+      fm.title = `Forma: ${formLabel(pForm)} (${pForm.toFixed(1)})`;
+      topRow.appendChild(fm);
     }
-    if (onBench) {
-      const tag = document.createElement('span');
-      tag.className   = 'player-team-tag bench-tag';
-      tag.textContent = 'čeka';
-      chip.appendChild(tag);
-    }
+
+    if (topRow.children.length) chip.appendChild(topRow);
+
+    // Donji red: avatar + ime
+    const bottomRow = document.createElement('div');
+    bottomRow.className = 'chip-bottom';
+
+    const av = document.createElement('div');
+    av.className   = 'player-avatar';
+    av.textContent = player.name.charAt(0).toUpperCase();
+
+    const nm = document.createElement('span');
+    nm.className   = 'player-name';
+    nm.textContent = player.name;
+
+    bottomRow.appendChild(av);
+    bottomRow.appendChild(nm);
+    chip.appendChild(bottomRow);
 
     grid.appendChild(chip);
   });
@@ -613,6 +619,51 @@ function calcPlayerStats(history) {
     .sort((a, b) => b.pts - a.pts || b.w - a.w || b.gp - a.gp);
 }
 
+function calcPlayerForm(name) {
+  const history = DB.getHistory();
+  const now     = Date.now();
+  const DECAY   = 42; // 6 tjedana u danima
+  let score = 0;
+  history.forEach(m => {
+    const allPlayers = [...(m.teamA || []), ...(m.teamB || [])];
+    if (!allPlayers.includes(name)) return;
+    const daysAgo = (now - new Date(m.date).getTime()) / 86400000;
+    score += Math.max(0, 1 - daysAgo / DECAY);
+  });
+  // Normalizacija: ~3.5 weighted bodova = forma 5.0
+  return Math.min(5, Math.max(1, 1 + (score / 3.5) * 4));
+}
+
+function formIcon(val) {
+  if (val >= 4.5) return '🔥';
+  if (val >= 3.5) return '💪';
+  if (val >= 2.5) return '👍';
+  if (val >= 1.8) return '😐';
+  return '🥶';
+}
+
+function formLabel(val) {
+  if (val >= 4.5) return 'Izvrsna';
+  if (val >= 3.5) return 'Dobra';
+  if (val >= 2.5) return 'OK';
+  if (val >= 1.8) return 'Slaba';
+  return 'Loša';
+}
+
+function formColor(val) {
+  if (val >= 4.0) return '#5ec05e';
+  if (val >= 3.0) return '#b0d0b0';
+  if (val >= 2.0) return '#c89a12';
+  return '#e06060';
+}
+
+function getPlayerOverall(name) {
+  const avgs = DB.getPlayerAvgRatings(name);
+  if (!avgs) return null;
+  const cats = ['tehnika', 'brzina', 'izdrzljivost', 'timska', 'pozicioniranje'];
+  return cats.reduce((s, c) => s + (avgs[c] || 0), 0) / cats.length;
+}
+
 function renderStatsTable(history) {
   const rows = calcPlayerStats(history);
   if (!rows.length) return '';
@@ -629,10 +680,15 @@ function renderStatsTable(history) {
             <th class="st-num">L</th>
             <th class="st-num">GP</th>
             <th class="st-num st-pts">Bod</th>
+            <th class="st-num st-rating">★</th>
+            <th class="st-num st-form">Forma</th>
           </tr>
         </thead>
         <tbody>
-          ${rows.map((r, i) => `
+          ${rows.map((r, i) => {
+            const ov   = getPlayerOverall(r.name);
+            const form = calcPlayerForm(r.name);
+            return `
             <tr${i === 0 ? ' class="st-first"' : ''}>
               <td class="st-pos">${i + 1}.</td>
               <td class="st-name clickable" onclick="openPlayerProfile('${r.name}')">${r.name}</td>
@@ -641,7 +697,10 @@ function renderStatsTable(history) {
               <td class="st-num">${r.l}</td>
               <td class="st-num">${r.gp}</td>
               <td class="st-num st-pts">${r.pts}</td>
-            </tr>`).join('')}
+              <td class="st-num st-rating">${ov != null ? ov.toFixed(1) : '–'}</td>
+              <td class="st-num st-form" title="${formLabel(form)} (${form.toFixed(1)})">${formIcon(form)}</td>
+            </tr>`;
+          }).join('')}
         </tbody>
       </table>
     </div>`;
@@ -781,10 +840,35 @@ function closeRatingModal() {
 function openPlayerProfile(playerName) {
   const avgs = DB.getPlayerAvgRatings(playerName);
   const body = document.getElementById('profile-body');
+  const form = calcPlayerForm(playerName);
   document.getElementById('profile-title').textContent = playerName;
 
+  // Forma sekcija — uvijek vidljiva
+  const formHtml = `
+    <div class="prof-form-row">
+      <div class="prof-form-info">
+        <span class="prof-form-label">Forma ${formIcon(form)}</span>
+        <span class="prof-form-desc">${formLabel(form)}</span>
+      </div>
+      <div class="prof-form-bar-wrap">
+        <div class="prof-form-bar" style="width:${(form / 5) * 100}%;background:${formColor(form)}"></div>
+      </div>
+      <span class="prof-form-val" style="color:${formColor(form)}">${form.toFixed(1)}</span>
+    </div>`;
+
   if (!avgs) {
-    body.innerHTML = '<div class="empty-state">Nema ocjena za ovog igrača.</div>';
+    body.innerHTML = `
+      <div class="prof-card">
+        <div class="prof-header">
+          <div class="prof-avatar">${playerName.charAt(0).toUpperCase()}</div>
+          <div class="prof-info">
+            <div class="prof-name">${playerName}</div>
+            <div class="prof-meta">Nema ocjena</div>
+          </div>
+        </div>
+        ${formHtml}
+        <div class="empty-state" style="padding:14px 0">Još nema ocjena za radar graf.</div>
+      </div>`;
     document.getElementById('player-profile').classList.remove('hidden');
     return;
   }
@@ -809,6 +893,7 @@ function openPlayerProfile(playerName) {
           <div class="prof-meta">${avgs._count} ocjen${avgs._count === 1 ? 'a' : avgs._count < 5 ? 'e' : 'a'}</div>
         </div>
       </div>
+      ${formHtml}
       <div class="prof-radar-wrap">${radarSvg}</div>
       <div class="prof-stats">${catRows}</div>
     </div>`;

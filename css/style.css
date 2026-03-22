@@ -20,6 +20,7 @@
 html, body {
   height: 100%;
   overflow: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 body {
@@ -261,7 +262,9 @@ main {
   position: absolute;
   top: calc(100% + 5px);
   left: 0;
+  right: auto;
   min-width: 140px;
+  max-width: calc(100vw - 24px);
   background: #0d1a0d;
   border: 1px solid var(--border-hl);
   border-radius: 10px;
@@ -438,7 +441,7 @@ main {
 /* Players grid */
 .players-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 7px;
 }
 
@@ -446,12 +449,27 @@ main {
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 7px 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  animation: fadeUp 0.2s ease;
+  transition: border-color 0.25s;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.chip-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip-bottom {
   display: flex;
   align-items: center;
   gap: 8px;
-  animation: fadeUp 0.2s ease;
-  transition: border-color 0.25s;
+  min-width: 0;
 }
 
 @keyframes fadeUp {
@@ -484,30 +502,43 @@ main {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+  flex: 1;
 }
 
 .player-rating {
-  margin-left: auto;
   font-size: 0.7rem;
   font-weight: 700;
   color: var(--gold-hl);
-  flex-shrink: 0;
   cursor: pointer;
   transition: opacity 0.15s;
 }
 .player-rating:hover { opacity: 0.75; }
 
-.player-team-tag {
-  margin-left: auto;
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: var(--muted);
-  flex-shrink: 0;
+.player-form {
+  font-size: 0.85rem;
+  line-height: 1;
 }
 
-/* Kad postoji i rating i team tag, rating ne gura tag */
-.player-chip .player-rating + .player-team-tag {
-  margin-left: 6px;
+.player-team-tag {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--bg-card);
+  background: var(--muted);
+  border-radius: 4px;
+  padding: 1px 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.team-a .player-team-tag { background: var(--gold); color: #1a0d00; }
+.team-b .player-team-tag { background: var(--blue); color: #ddeeff; }
+
+.bench .player-team-tag {
+  background: none;
+  color: var(--muted);
+  font-style: italic;
+  padding: 0;
 }
 
 .empty-state {
@@ -1022,6 +1053,15 @@ main {
   color: var(--gold-hl);
 }
 
+.st-rating {
+  color: var(--gold-hl) !important;
+  font-weight: 700;
+}
+
+.st-form {
+  font-weight: 700;
+}
+
 /* ── Shared overlay (reusable for rating + profile) ──── */
 .overlay-tab {
   position: fixed;
@@ -1041,6 +1081,9 @@ main {
   width: 100%;
   max-width: 600px;
   padding: 24px 20px 40px;
+  padding-left: max(20px, env(safe-area-inset-left));
+  padding-right: max(20px, env(safe-area-inset-right));
+  padding-bottom: max(40px, env(safe-area-inset-bottom));
 }
 
 /* Clickable elements */
@@ -1220,6 +1263,58 @@ main {
   height: 240px;
 }
 
+/* Form row in profile */
+.prof-form-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+
+.prof-form-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 60px;
+}
+
+.prof-form-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+.prof-form-desc {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.prof-form-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.prof-form-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.prof-form-val {
+  font-size: 1rem;
+  font-weight: 800;
+  min-width: 32px;
+  text-align: right;
+}
+
 .prof-stats {
   border-top: 1px solid var(--border);
   padding-top: 12px;
@@ -1307,26 +1402,117 @@ main {
 
   main {
     grid-template-columns: 1fr;
-    padding: 10px;
-    gap: 10px;
+    padding: 8px;
+    gap: 8px;
     height: auto;
     overflow: visible;
   }
 
+  /* Layout */
   .left-panel  { overflow-y: visible; min-height: auto; }
   .right-panel { min-height: auto; }
   .pitch-card  { flex: none; min-height: auto; overflow: visible; }
-  .pitch-wrap  { flex: none; min-height: auto; }
+  .pitch-wrap  { flex: none; min-height: auto; aspect-ratio: 500 / 320; }
   #pitch       { height: auto; }
 
+  /* Header: kompaktni za mobile */
+  header { height: 50px; }
+  :root { --header-h: 50px; }
+  .header-inner { padding: 0 12px; gap: 8px; }
   .header-text .tagline { display: none; }
-  h1 { font-size: 1rem; letter-spacing: 1.5px; }
-  .ball { font-size: 1.5rem; }
+  h1 { font-size: 0.9rem; letter-spacing: 1.5px; }
+  .ball { font-size: 1.3rem; }
+  .reg-status { display: none; }
+  .mock-tag { display: none; }
+  .mock-user-pill { padding: 4px 8px 4px 4px; gap: 5px; font-size: 0.78rem; }
+  .mock-user-avatar { width: 32px; height: 32px; font-size: 0.85rem; }
 
-  .session-bar { padding: 9px 12px; }
+  /* Session bar */
+  .session-bar { padding: 10px 12px; }
   .session-controls { margin-left: 0; width: 100%; }
+  .cs-btn { padding: 8px 12px 8px 14px; min-height: 38px; font-size: 0.82rem; }
+  .cs-opt { padding: 12px 14px; font-size: 0.88rem; }
+  .cs-menu { min-width: 160px; }
 
-  .players-grid { grid-template-columns: 1fr 1fr; }
+  /* Gumbi — min 44px touch target */
+  .btn-register { padding: 12px 20px; font-size: 0.92rem; min-height: 44px; }
+  .btn-draw { padding: 10px 18px; font-size: 0.85rem; min-height: 44px; }
+  .btn-admin { padding: 10px 16px; min-height: 44px; }
+  .btn-open-session { padding: 12px; font-size: 0.92rem; min-height: 44px; }
+  .btn-save-result { padding: 12px; font-size: 0.88rem; min-height: 44px; }
+  .btn-history-all { padding: 8px 12px; font-size: 0.78rem; min-height: 44px;
+    display: flex; align-items: center; }
+  .btn-rate-match { padding: 10px; font-size: 0.82rem; min-height: 44px; }
+  .btn-rate-submit { padding: 12px; font-size: 0.85rem; min-height: 44px; }
+  .btn-back { padding: 10px 16px; min-height: 44px; }
 
-  .right-panel { order: -1; }
+  /* Registration card */
+  .reg-card { padding: 12px; }
+  .user-avatar { width: 40px; height: 40px; font-size: 1.1rem; }
+
+  /* Igrači */
+  .players-card { padding: 12px; }
+  .players-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .player-chip { padding: 10px; min-height: 44px; }
+  .player-avatar { width: 30px; height: 30px; }
+  .player-name { font-size: 0.82rem; }
+
+  /* Admin panel */
+  .admin-card { padding: 12px; }
+  .admin-select { padding: 10px 12px; font-size: 0.85rem; min-height: 44px; }
+  .score-input { width: 56px; font-size: 1.4rem; padding: 8px 4px; min-height: 44px; }
+
+  /* Overlays — padding za mobile */
+  .overlay-tab-inner { padding: 16px 12px 32px; }
+  .history-tab-header { gap: 10px; margin-bottom: 16px; }
+  .history-tab-header h2 { font-size: 0.9rem; }
+
+  /* Match cards */
+  .hf-card { padding: 14px; }
+  .hf-header { flex-direction: column; gap: 2px; }
+  .hf-score { font-size: 1.4rem; }
+
+  /* Rating modal */
+  .rate-player-card { padding: 12px; }
+  .rpc-avatar { width: 36px; height: 36px; }
+  .star { font-size: 1.7rem; }
+  .star-row { gap: 6px; }
+  .rpc-row { padding: 7px 0; }
+  .rpc-label { font-size: 0.82rem; }
+
+  /* Radar chart */
+  .radar-svg { width: 220px; height: 220px; }
+  .prof-card { padding: 16px; }
+  .prof-avatar { width: 44px; height: 44px; }
+
+  /* Stats table */
+  .stats-table { font-size: 0.78rem; }
+  .stats-table th { font-size: 0.62rem; padding: 8px 3px; }
+  .stats-table td { padding: 10px 3px; }
+
+  /* Pitch ispod svega */
+  .right-panel { order: 1; }
+}
+
+/* ── Extra small (<400px) ────────────────────────────── */
+@media (max-width: 400px) {
+  main { padding: 6px; gap: 6px; }
+
+  h1 { font-size: 0.82rem; letter-spacing: 1px; }
+  .ball { font-size: 1.1rem; }
+
+  .players-grid { grid-template-columns: 1fr; }
+  .player-chip { padding: 10px 12px; }
+
+  .hf-rosters { grid-template-columns: 1fr; gap: 8px; }
+  .hf-roster-right { text-align: left; }
+
+  .rpc-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+
+  .prof-stat-label { min-width: 80px; font-size: 0.72rem; }
+}
+
+/* ── Landscape phones ────────────────────────────────── */
+@media (max-height: 500px) and (orientation: landscape) {
+  .pitch-wrap { max-height: 50vh; }
 }
