@@ -49,7 +49,8 @@ function currentUser() {
 }
 function currentNick()  { return currentUser().nick; }
 function isAdmin()      { return currentUser().role === 'admin'; }
-function sessionOpen()  { return state.session.status === 'open'; }
+function sessionOpen()    { return state.session.status === 'open'; }
+function sessionActive()  { return state.session.status === 'open' || state.session.status === 'locked'; }
 
 function getActiveCount() {
   const n = state.players.length;
@@ -282,6 +283,7 @@ function bootApp() {
         case 'register':         registerPlayer(); break;
         case 'draw-teams':       drawTeams(); break;
         case 'open-session':     openSession(); break;
+        case 'lock-session':     lockSession(); break;
         case 'close-session':    closeSession(); break;
         case 'add-player-admin': addPlayerAsAdmin(); break;
         case 'submit-result':    submitResult(); break;
@@ -341,16 +343,24 @@ function updateMockUserUI() {
 // ── Admin panel ────────────────────────────────────────────────────────────
 
 function refreshAdminPanel() {
-  const isOpen = sessionOpen();
+  const status = state.session.status || 'closed';
+  const isOpen   = status === 'open';
+  const isLocked = status === 'locked';
+  const isActive = isOpen || isLocked;
 
-  document.getElementById('ui-session-closed').classList.toggle('hidden', isOpen);
+  document.getElementById('ui-session-closed').classList.toggle('hidden', isActive);
   document.getElementById('ui-session-open').classList.toggle('hidden', !isOpen);
-  document.getElementById('admin-actions').classList.toggle('hidden', !isOpen);
+  document.getElementById('ui-session-locked').classList.toggle('hidden', !isLocked);
+  document.getElementById('admin-actions').classList.toggle('hidden', !isActive);
 
   document.getElementById('next-wed-display').textContent =
     getNextWednesday().toLocaleDateString('hr-HR', { weekday: 'long', day: 'numeric', month: 'long' });
 
-  if (!isOpen) return;
+  if (!isActive) return;
+
+  // Sekcija "Dodaj igrača" skrivena kad locked
+  const addPlayerSection = document.getElementById('admin-player-select')?.closest('.admin-section');
+  if (addPlayerSection) addPlayerSection.classList.toggle('hidden', isLocked);
 
   // "Dodaj igrača" select — samo neprijavljeni korisnici
   const registered = new Set(state.players.map(p => p.name));
@@ -391,8 +401,16 @@ function openSession() {
   render();
 }
 
+function lockSession() {
+  state.session = { ...state.session, status: 'locked' };
+  DB.saveSession(state.session);
+  updateRegCard();
+  refreshAdminPanel();
+  render();
+}
+
 function closeSession() {
-  if (!confirm('Zatvori prijave i resetiraj listu igrača za ovu srijedu?')) return;
+  if (!confirm('Zatvori natjecanje i resetiraj sve?')) return;
   state.session = {
     ...state.session,
     status:     'closed',
@@ -410,8 +428,14 @@ function closeSession() {
 
 function updateRegCard() {
   const isOpen = sessionOpen();
+  const isLocked = state.session.status === 'locked';
   document.getElementById('reg-locked').classList.toggle('hidden', isOpen);
   document.getElementById('reg-open').classList.toggle('hidden', !isOpen);
+  if (isLocked) {
+    document.getElementById('reg-locked-msg').textContent = 'Prijave su zatvorene.';
+  } else if (!isOpen) {
+    document.getElementById('reg-locked-msg').textContent = 'Admin još nije otvorio prijave.';
+  }
 }
 
 // ── Admin akcije ───────────────────────────────────────────────────────────

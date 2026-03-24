@@ -164,7 +164,15 @@
           <div id="ui-session-open" class="hidden">
             <div class="session-status-row">
               <span class="session-open-dot">● Prijave otvorene</span>
-              <button class="btn-admin" data-action="close-session">Zatvori</button>
+              <button class="btn-admin" data-action="lock-session">Zatvori prijave</button>
+            </div>
+          </div>
+
+          <!-- Prijave zatvorene, natjecanje aktivno -->
+          <div id="ui-session-locked" class="hidden">
+            <div class="session-status-row">
+              <span class="session-locked-dot">🔒 Prijave zatvorene</span>
+              <button class="btn-admin btn-danger" data-action="close-session">Zatvori natjecanje</button>
             </div>
           </div>
         </div>

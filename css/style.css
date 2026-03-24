@@ -784,6 +784,23 @@ main {
   letter-spacing: 0.5px;
 }
 
+.session-locked-dot {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #e8a820;
+  letter-spacing: 0.5px;
+}
+
+.btn-danger {
+  border-color: #6a2020 !important;
+  color: #e06060 !important;
+  background: rgba(224, 96, 96, 0.08) !important;
+}
+.btn-danger:hover {
+  border-color: #e06060 !important;
+  background: rgba(224, 96, 96, 0.15) !important;
+}
+
 .btn-admin {
   background: var(--bg-input);
   color: var(--text);
