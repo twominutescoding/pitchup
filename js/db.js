@@ -5,7 +5,7 @@
  * Fallback: localStorage (offline / file:// protokol)
  *
  * Firestore kolekcije:
- *   users    → whitelist igrača s rolama (doc ID = nick)
+ *   users    → whitelist igrača s rolama (doc ID = email)
  *   config   → session doc (doc ID = "session")
  *   players  → prijavljeni igrači (doc ID = player id)
  *   history  → povijest rezultata (doc ID = auto)
@@ -137,7 +137,7 @@ const DB = (() => {
       const users = await fetchJSON('data/users.json', SEED_USERS);
       const batch = _db.batch();
       users.forEach(u => {
-        batch.set(_db.collection('users').doc(u.nick), u);
+        batch.set(_db.collection('users').doc(u.email), u);
       });
       await batch.commit();
       console.info('DB: Firestore users seeded');
@@ -160,23 +160,6 @@ const DB = (() => {
       });
       await batch.commit();
       console.info('DB: Firestore history seeded');
-    }
-
-    // allowedEmails — whitelist za Firestore Security Rules
-    // Doc ID = email, sadrži nick i role za provjeru u rules
-    const aeSnap = await _db.collection('allowedEmails').limit(1).get();
-    if (aeSnap.empty) {
-      const users = _cache.users || SEED_USERS;
-      const batch2 = _db.batch();
-      users.forEach(u => {
-        batch2.set(_db.collection('allowedEmails').doc(u.email), {
-          nick: u.nick,
-          role: u.role,
-          email: u.email,
-        });
-      });
-      await batch2.commit();
-      console.info('DB: Firestore allowedEmails seeded');
     }
 
     // Players i ratings — prazne kolekcije, ne treba seed
@@ -278,14 +261,32 @@ const DB = (() => {
         _cache.players = lsLoad(KEYS.players) ?? [];
         _cache.history = lsLoad(KEYS.history) ?? [];
         _cache.ratings = lsLoad(KEYS.ratings) ?? [];
-
-        await seedFirestore();
-        setupListeners();
-        console.info('DB: Firestore inicijaliziran s real-time listenerima');
+        console.info('DB: Firestore inicijaliziran (čeka auth za listenere)');
       } else {
         await initLocalStorage();
         console.info('DB: localStorage fallback');
       }
+    },
+
+    /** Pozovi NAKON Firebase Auth login-a. Pokreće seed + real-time listenere. */
+    async startListeners() {
+      if (!_useFirestore || _unsubscribers.length > 0) return; // već pokrenuto
+      try {
+        await seedFirestore();
+      } catch (e) {
+        console.warn('DB: Seed nije uspio:', e.message);
+      }
+      // Dohvati users SINHRONO iz Firestore-a prije pokretanja listenera
+      // — sprječava race condition kod whitelist checka
+      try {
+        const usersSnap = await _db.collection('users').get();
+        _cache.users = usersSnap.docs.map(d => d.data());
+        lsSave(KEYS.users, _cache.users);
+      } catch (e) {
+        console.warn('DB: Fetch users nije uspio:', e.message);
+      }
+      setupListeners();
+      console.info('DB: Real-time listeneri pokrenuti');
     },
 
     // ── Getteri (čitaju iz in-memory cachea) ──────────────────────────────

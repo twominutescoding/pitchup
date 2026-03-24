@@ -72,6 +72,11 @@ async function init() {
   try {
     const existingUser = Auth.check();
     if (existingUser) {
+      // Auth + listeneri moraju biti aktivni prije whitelist checka
+      await Auth.restoreFirebaseAuth();
+      await DB.startListeners();
+      state.users = DB.getUsers();
+
       const whitelisted = state.users.find(u => u.email === existingUser.email);
       if (whitelisted) {
         loginWithGoogle(existingUser);
@@ -138,6 +143,13 @@ async function handleGoogleLogin(response) {
     return;
   }
 
+  // Firebase Auth mora biti aktivan PRIJE čitanja Firestore-a (security rules)
+  await Auth.restoreFirebaseAuth();
+  await DB.startListeners();
+
+  // Sada osvježi users iz Firestore-a (nakon auth-a)
+  state.users = DB.getUsers();
+
   const whitelisted = state.users.find(u => u.email === user.email);
   if (!whitelisted) {
     Auth.clear();
@@ -153,8 +165,10 @@ async function loginWithGoogle(googleUser) {
   state.authMode   = 'google';
   state.googleUser = googleUser;
 
-  // Prijavi se u Firebase Auth (za Firestore security rules)
+  // Firebase Auth + Firestore listeneri (ako još nisu pokrenuti)
   await Auth.restoreFirebaseAuth();
+  await DB.startListeners();
+  state.users = DB.getUsers();
 
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('main-content').classList.remove('hidden');
@@ -244,27 +258,42 @@ function bootApp() {
   document.addEventListener('click', e => {
     if (!e.target.closest('.cs')) closeAllCs();
 
-    // Delegirani event listeneri za data-* atribute (umjesto inline onclick s interpolacijom)
+    // Centralni delegirani event handler za data-action atribute
+    const actionEl = e.target.closest('[data-action]');
+    if (actionEl) {
+      const action = actionEl.dataset.action;
+      switch (action) {
+        case 'logout':           doLogout(); break;
+        case 'next-mock-user':   nextMockUser(); break;
+        case 'dev-mode':         enterDevMode(); break;
+        case 'toggle-cs':        toggleCs(actionEl.dataset.cs); break;
+        case 'pick-cs':          pickCs(actionEl.dataset.cs, actionEl, actionEl.dataset.label); break;
+        case 'register':         registerPlayer(); break;
+        case 'draw-teams':       drawTeams(); break;
+        case 'open-session':     openSession(); break;
+        case 'close-session':    closeSession(); break;
+        case 'add-player-admin': addPlayerAsAdmin(); break;
+        case 'submit-result':    submitResult(); break;
+        case 'show-history':     showHistoryTab(); break;
+        case 'hide-history':     hideHistoryTab(); break;
+        case 'close-rating':     closeRatingModal(); break;
+        case 'close-profile':    closePlayerProfile(); break;
+      }
+      return;
+    }
+
+    // Delegirani listeneri za dinamički generirani sadržaj
     const profileEl = e.target.closest('[data-profile]');
-    if (profileEl) {
-      openPlayerProfile(profileEl.dataset.profile);
-      return;
-    }
+    if (profileEl) { openPlayerProfile(profileEl.dataset.profile); return; }
+
     const matchDateEl = e.target.closest('[data-match-date]');
-    if (matchDateEl) {
-      openRatingModal(matchDateEl.dataset.matchDate);
-      return;
-    }
+    if (matchDateEl) { openRatingModal(matchDateEl.dataset.matchDate); return; }
+
     const ratePlayerEl = e.target.closest('[data-rate-player]');
-    if (ratePlayerEl) {
-      submitPlayerRating(ratePlayerEl.dataset.ratePlayer);
-      return;
-    }
+    if (ratePlayerEl) { submitPlayerRating(ratePlayerEl.dataset.ratePlayer); return; }
+
     const starEl = e.target.closest('.star[data-val]');
-    if (starEl) {
-      pickStar(starEl);
-      return;
-    }
+    if (starEl) { pickStar(starEl); return; }
   });
 }
 

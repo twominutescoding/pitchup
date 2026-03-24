@@ -344,16 +344,15 @@ Ovo napravi kad si gotov s testiranjem (ili kad istekne test mode za 30 dana).
 Pravila koriste **dvoslojnu zaštitu**:
 
 1. **Firebase Auth** — korisnik mora biti autentificiran putem Google OAuth-a
-2. **Email whitelist** — korisnikov email mora postojati u `allowedEmails` Firestore kolekciji
+2. **Email whitelist** — korisnikov email mora postojati u `users` Firestore kolekciji (doc ID = email)
 
-Kolekcija `allowedEmails` se automatski seeda iz `users` kolekcije pri prvom pokretanju appa. Svaki dokument ima ID = email korisnika i sadrži `nick`, `role` i `email` polja.
+Kolekcija `users` koristi **email kao Document ID**, što omogućuje security rules da direktno provjere `exists(users/$(request.auth.token.email))`.
 
 #### Pregled pravila po kolekcijama
 
 | Kolekcija | Čitanje | Pisanje |
 |-----------|---------|---------|
-| `users` | Whitelisted korisnici | Samo admini |
-| `allowedEmails` | Autentificirani (za self-check) | Samo admini |
+| `users` | Autentificirani (za whitelist provjeru) | Samo admini |
 | `config` | Whitelisted korisnici | Samo admini |
 | `players` | Whitelisted korisnici | Whitelisted korisnici |
 | `history` | Whitelisted korisnici | Samo admini |
@@ -363,11 +362,10 @@ Ovo znači: **čak i da netko ima Firebase config, bez Google računa koji je u 
 
 #### Dodavanje novog korisnika u whitelist
 
-Kad dodaješ novog korisnika, moraš ga dodati na **dva mjesta**:
-1. `users` kolekcija (za app logiku)
-2. `allowedEmails` kolekcija (za security rules) — doc ID = email
-
-Ili pozovi `DB.reset()` koji će automatski reseedati `allowedEmails` iz `users`.
+Dodaj dokument u `users` kolekciju s **Document ID = email adresa**:
+- `nick` (string): nadimak igrača
+- `role` (string): `admin` ili `user`
+- `email` (string): email adresa
 
 ---
 

@@ -8,29 +8,23 @@ service cloud.firestore {
     }
 
     // Helper: je li korisnikov email na whitelisti?
-    // Koristi 'allowedEmails' kolekciju gdje je doc ID = email adresa.
+    // users kolekcija koristi email kao document ID.
     // Dvoslojna zaštita: Firebase Auth + email whitelist u Firestore.
     function emailAllowed() {
       return isAuth() &&
-        exists(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email));
+        exists(/databases/$(database)/documents/users/$(request.auth.token.email));
     }
 
     // Helper: je li korisnik admin?
     function isAdmin() {
       return emailAllowed() &&
-        get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.role == 'admin';
+        get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.role == 'admin';
     }
 
-    // ── users kolekcija ──────────────────────────────────────────────
-    // Čitanje: whitelisted korisnici. Pisanje: samo admini.
-    match /users/{nick} {
-      allow read:  if emailAllowed();
-      allow write: if isAdmin();
-    }
-
-    // ── allowedEmails kolekcija (whitelist za rules) ─────────────────
-    // Čitanje: autentificirani (trebaju provjeriti sebe). Pisanje: samo admini.
-    match /allowedEmails/{email} {
+    // ── users kolekcija (doc ID = email) ─────────────────────────────
+    // Čitanje: autentificirani (trebaju provjeriti sebe za whitelist).
+    // Pisanje: samo admini.
+    match /users/{email} {
       allow read:  if isAuth();
       allow write: if isAdmin();
     }
@@ -61,7 +55,7 @@ service cloud.firestore {
     match /ratings/{ratingId} {
       allow read:  if emailAllowed();
       allow create: if emailAllowed() &&
-        request.resource.data.rater == get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.nick;
+        request.resource.data.rater == get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.nick;
       allow update, delete: if false;
     }
   }

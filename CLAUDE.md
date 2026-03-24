@@ -37,7 +37,7 @@ To reset app state during development, run `DB.reset()` in the browser console.
 **Firestore collections**:
 | Collection | Document ID | Fields |
 |------------|-------------|--------|
-| `users` | nick | nick, role, email |
+| `users` | email | nick, role, email |
 | `config` | `session` (single doc) | status, date, field, time, teamsDrawn, markerTeam |
 | `players` | player id | id, name, team |
 | `history` | auto-generated | date, field, time, scoreA, scoreB, teamA, teamB |

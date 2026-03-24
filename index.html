@@ -7,7 +7,7 @@
     default-src 'none';
     script-src 'self' https://www.gstatic.com/firebasejs/ https://accounts.google.com/gsi/;
     style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/;
-    connect-src https://firestore.googleapis.com https://*.firebaseio.com https://www.googleapis.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://accounts.google.com/;
+    connect-src https://firestore.googleapis.com https://*.firebaseio.com https://www.googleapis.com https://www.gstatic.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://accounts.google.com/;
     img-src 'self' https://*.googleusercontent.com data:;
     frame-src https://accounts.google.com/;
     font-src 'self';
@@ -15,6 +15,7 @@
     form-action 'none';
   ">
   <title>Srijeda Nogomet</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
   <link rel="stylesheet" href="css/style.css">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -35,11 +36,11 @@
           <img class="user-pill-photo" id="google-avatar" src="" alt="">
           <span id="google-nick"></span>
           <span id="google-role-badge" class="role-badge role-user"></span>
-          <button class="btn-logout" onclick="doLogout()" title="Odjava">✕</button>
+          <button class="btn-logout" data-action="logout" title="Odjava">✕</button>
         </div>
 
         <!-- Mock user pill (za dev/testiranje) -->
-        <div class="mock-user-pill hidden" id="mock-user-pill" title="Demo: klikni za promjenu korisnika" onclick="nextMockUser()">
+        <div class="mock-user-pill hidden" id="mock-user-pill" title="Demo: klikni za promjenu korisnika" data-action="next-mock-user">
           <span class="mock-user-avatar" id="mock-avatar">L</span>
           <span id="mock-nick">LukaB</span>
           <span id="mock-role-badge" class="role-badge role-admin">ADMIN</span>
@@ -57,7 +58,7 @@
       <p class="login-subtitle">Prijavi se za nastavak</p>
       <div id="google-btn-container" class="google-btn-wrap"></div>
       <p class="login-note" id="login-note"></p>
-      <button class="btn-dev-mode" onclick="enterDevMode()">Dev mode (bez prijave)</button>
+      <button class="btn-dev-mode" data-action="dev-mode">Dev mode (bez prijave)</button>
     </div>
   </div>
 
@@ -74,27 +75,27 @@
 
           <!-- Teren dropdown -->
           <div class="cs" id="cs-field">
-            <button class="cs-btn" onclick="toggleCs('cs-field')">
+            <button class="cs-btn" data-action="toggle-cs" data-cs="cs-field">
               <span class="cs-val">Velesajam 2</span>
               <svg class="cs-arrow" viewBox="0 0 10 6" width="10" height="6"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
             </button>
             <div class="cs-menu">
-              <div class="cs-opt active" onclick="pickCs('cs-field', this, 'Velesajam 2')">Velesajam 2</div>
-              <div class="cs-opt"        onclick="pickCs('cs-field', this, 'Velesajam 1')">Velesajam 1</div>
-              <div class="cs-opt"        onclick="pickCs('cs-field', this, 'Špansko')">Špansko</div>
+              <div class="cs-opt active" data-action="pick-cs" data-cs="cs-field" data-label="Velesajam 2">Velesajam 2</div>
+              <div class="cs-opt"        data-action="pick-cs" data-cs="cs-field" data-label="Velesajam 1">Velesajam 1</div>
+              <div class="cs-opt"        data-action="pick-cs" data-cs="cs-field" data-label="Špansko">Špansko</div>
             </div>
           </div>
 
           <!-- Termin dropdown -->
           <div class="cs" id="cs-time">
-            <button class="cs-btn" onclick="toggleCs('cs-time')">
+            <button class="cs-btn" data-action="toggle-cs" data-cs="cs-time">
               <span class="cs-val">19 – 20h</span>
               <svg class="cs-arrow" viewBox="0 0 10 6" width="10" height="6"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
             </button>
             <div class="cs-menu">
-              <div class="cs-opt active" onclick="pickCs('cs-time', this, '19 – 20h')">19 – 20h</div>
-              <div class="cs-opt"        onclick="pickCs('cs-time', this, '18 – 19h')">18 – 19h</div>
-              <div class="cs-opt"        onclick="pickCs('cs-time', this, '20 – 21h')">20 – 21h</div>
+              <div class="cs-opt active" data-action="pick-cs" data-cs="cs-time" data-label="19 – 20h">19 – 20h</div>
+              <div class="cs-opt"        data-action="pick-cs" data-cs="cs-time" data-label="18 – 19h">18 – 19h</div>
+              <div class="cs-opt"        data-action="pick-cs" data-cs="cs-time" data-label="20 – 21h">20 – 21h</div>
             </div>
           </div>
 
@@ -119,7 +120,7 @@
                 <span class="user-label">prijavljen kao</span>
               </div>
             </div>
-            <button class="btn-register" id="register-btn" onclick="registerPlayer()">Prijavi se</button>
+            <button class="btn-register" id="register-btn" data-action="register">Prijavi se</button>
           </div>
           <p class="reg-note" id="reg-note"></p>
         </div>
@@ -132,7 +133,7 @@
             <span class="section-label">Prijavljeni</span>
             <span id="player-count" class="badge">0</span>
           </div>
-          <button id="draw-btn" class="btn-draw hidden" onclick="drawTeams()">🎲 Žrijebaj</button>
+          <button id="draw-btn" class="btn-draw hidden" data-action="draw-teams">🎲 Žrijebaj</button>
         </div>
         <div id="team-legend" class="team-legend hidden"></div>
         <div id="players-list"></div>
@@ -152,14 +153,14 @@
           <!-- Prijave zatvorene -->
           <div id="ui-session-closed">
             <p class="session-next-date">Sljedeća srijeda: <strong id="next-wed-display">—</strong></p>
-            <button class="btn-open-session" onclick="openSession()">Otvori prijave →</button>
+            <button class="btn-open-session" data-action="open-session">Otvori prijave →</button>
           </div>
 
           <!-- Prijave otvorene -->
           <div id="ui-session-open" class="hidden">
             <div class="session-status-row">
               <span class="session-open-dot">● Prijave otvorene</span>
-              <button class="btn-admin" onclick="closeSession()">Zatvori</button>
+              <button class="btn-admin" data-action="close-session">Zatvori</button>
             </div>
           </div>
         </div>
@@ -174,7 +175,7 @@
               <select id="admin-player-select" class="admin-select">
                 <option value="">— odaberi —</option>
               </select>
-              <button class="btn-admin" onclick="addPlayerAsAdmin()">Dodaj</button>
+              <button class="btn-admin" data-action="add-player-admin">Dodaj</button>
             </div>
           </div>
 
@@ -190,7 +191,7 @@
               <span class="result-dash">–</span>
               <input type="number" id="score-b" class="score-input" value="0" min="0" max="99">
             </div>
-            <button class="btn-save-result" onclick="submitResult()">Spremi rezultat</button>
+            <button class="btn-save-result" data-action="submit-result">Spremi rezultat</button>
             <p class="admin-note" id="result-note"></p>
           </div>
 
@@ -203,7 +204,7 @@
           <div class="players-title">
             <span class="section-label">📋 Rezultati</span>
           </div>
-          <button class="btn-history-all" id="btn-history-all" onclick="showHistoryTab()">Svi rezultati →</button>
+          <button class="btn-history-all" id="btn-history-all" data-action="show-history">Svi rezultati →</button>
         </div>
         <div id="history-list"></div>
       </div>
@@ -318,7 +319,7 @@
   <div id="history-tab" class="history-tab overlay-tab hidden">
     <div class="overlay-tab-inner">
       <div class="history-tab-header">
-        <button class="btn-back" onclick="hideHistoryTab()">← Natrag</button>
+        <button class="btn-back" data-action="hide-history">← Natrag</button>
         <h2>Svi rezultati</h2>
       </div>
       <div id="history-full-list" class="history-full-list"></div>
@@ -329,7 +330,7 @@
   <div id="rating-modal" class="overlay-tab hidden">
     <div class="overlay-tab-inner">
       <div class="history-tab-header">
-        <button class="btn-back" onclick="closeRatingModal()">← Natrag</button>
+        <button class="btn-back" data-action="close-rating">← Natrag</button>
         <h2 id="rating-modal-title">Ocijeni igrače</h2>
       </div>
       <div id="rating-modal-body"></div>
@@ -340,7 +341,7 @@
   <div id="player-profile" class="overlay-tab hidden">
     <div class="overlay-tab-inner">
       <div class="history-tab-header">
-        <button class="btn-back" onclick="closePlayerProfile()">← Natrag</button>
+        <button class="btn-back" data-action="close-profile">← Natrag</button>
         <h2 id="profile-title">Profil igrača</h2>
       </div>
       <div id="profile-body"></div>
