@@ -1,12 +1,13 @@
 'use strict';
 
 /**
- * auth.js — Google Identity Services autentifikacija
+ * auth.js — Google Identity Services + Firebase Auth
  *
  * Flow:
  *  1. Na loadu provjeri localStorage za nfg_auth (JWT credential)
  *  2. Ako nema ili je istekao → prikaži login ekran
  *  3. Ako je validan → dekodiraj, provjeri email u whitelisti, nastavi
+ *  4. Koristi Google ID token za Firebase Auth (signInWithCredential)
  *
  * JWT payload od Googlea sadrži: sub, email, name, picture, iat, exp
  */
@@ -53,8 +54,21 @@ const Auth = (() => {
 
   function isExpired(payload) {
     if (!payload || !payload.exp) return true;
-    // exp je unix timestamp u sekundama
     return Date.now() / 1000 > payload.exp;
+  }
+
+  /**
+   * Prijavi se u Firebase Auth koristeći Google ID token.
+   * Ovo omogućuje Firestore Security Rules da provjere request.auth.
+   */
+  async function signInToFirebase(idToken) {
+    try {
+      if (typeof firebase === 'undefined' || !firebase.auth) return;
+      const credential = firebase.auth.GoogleAuthProvider.credential(idToken);
+      await firebase.auth().signInWithCredential(credential);
+    } catch (e) {
+      console.warn('Firebase Auth sign-in neuspješan:', e);
+    }
   }
 
   return {
@@ -81,19 +95,34 @@ const Auth = (() => {
     /**
      * Callback od Google Sign-In.
      * Prima response s credential (JWT).
-     * Vraća user objekt ili null ako email nije u whitelisti.
+     * Vraća user objekt ili null ako dekodiranje ne uspije.
+     * Također se prijavljuje u Firebase Auth.
      */
-    handleCredential(response) {
+    async handleCredential(response) {
       const payload = decodeJwt(response.credential);
       if (!payload || !payload.email) return null;
 
       save(response.credential, payload);
+
+      // Firebase Auth — koristi isti Google ID token
+      await signInToFirebase(response.credential);
 
       return {
         email:   payload.email,
         name:    payload.name,
         picture: payload.picture,
       };
+    },
+
+    /**
+     * Ako postoji stored credential, prijavi se u Firebase Auth.
+     * Poziva se na app startu kad je sesija već validna.
+     */
+    async restoreFirebaseAuth() {
+      const stored = getStored();
+      if (stored && stored.credential && !isExpired(stored)) {
+        await signInToFirebase(stored.credential);
+      }
     },
 
     clear() {
@@ -103,12 +132,10 @@ const Auth = (() => {
     logout() {
       clear();
       try { google.accounts.id.disableAutoSelect(); } catch (_) {}
+      try { firebase.auth().signOut(); } catch (_) {}
       location.reload();
     },
 
-    /**
-     * Inicijalizira Google Sign-In i renderira gumb.
-     */
     initGoogleButton(containerId, callback) {
       google.accounts.id.initialize({
         client_id: CLIENT_ID,
@@ -126,7 +153,6 @@ const Auth = (() => {
           width: 280,
         }
       );
-      // Samo renderani gumb, bez One Tap prompt-a (izaziva origin_mismatch nakon logoutа)
     },
   };
 

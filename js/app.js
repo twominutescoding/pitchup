@@ -100,7 +100,7 @@ function showLoginScreen() {
   tryInitGoogleBtn();
 }
 
-function handleGoogleLogin(response) {
+async function handleGoogleLogin(response) {
   const note = document.getElementById('login-note');
   note.textContent = '';
   note.classList.remove('login-error');
@@ -111,7 +111,7 @@ function handleGoogleLogin(response) {
     return;
   }
 
-  const user = Auth.handleCredential(response);
+  const user = await Auth.handleCredential(response);
   if (!user) {
     note.textContent = 'Neuspješno dekodiranje prijave. Pokušaj ponovo.';
     note.classList.add('login-error');
@@ -129,9 +129,12 @@ function handleGoogleLogin(response) {
   loginWithGoogle(user);
 }
 
-function loginWithGoogle(googleUser) {
+async function loginWithGoogle(googleUser) {
   state.authMode   = 'google';
   state.googleUser = googleUser;
+
+  // Prijavi se u Firebase Auth (za Firestore security rules)
+  await Auth.restoreFirebaseAuth();
 
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('main-content').classList.remove('hidden');
@@ -190,6 +193,24 @@ function bootApp() {
   updateRegCard();
   render();
   renderHistory();
+
+  // Real-time listeneri — Firestore automatski triggeraju re-render
+  DB.subscribe(() => {
+    state.users   = DB.getUsers();
+    state.session = DB.getSession();
+    state.players = DB.getPlayers();
+
+    updateRegCard();
+    if (state.authMode === 'dev') updateMockUserUI();
+    else {
+      document.getElementById('admin-card').classList.toggle('hidden', !isAdmin());
+      if (isAdmin()) refreshAdminPanel();
+      document.getElementById('register-btn').disabled =
+        state.players.some(p => p.name === currentNick());
+    }
+    render();
+    renderHistory();
+  });
 
   document.addEventListener('click', e => {
     if (!e.target.closest('.cs')) closeAllCs();

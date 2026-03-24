@@ -1,18 +1,22 @@
 /**
  * db.js — Apstrakcijski sloj za perzistenciju podataka
  *
- * Trenutno: localStorage (radi i offline, preživljava refresh)
- * Budućnost: zamijeniti read/write metode s Google Sheets API pozivima
+ * Backend: Firebase Firestore s real-time listenerima
+ * Fallback: localStorage (offline / file:// protokol)
  *
- * Ključevi u localStorage:
- *   nfg_users   → whitelist igrača s rolama
- *   nfg_session → stanje tekuće sesije (otvorena/zatvorena, žrijeb, markeri)
- *   nfg_players → prijavljeni igrači za tekuću srijedu
- *   nfg_history → povijest rezultata
+ * Firestore kolekcije:
+ *   users    → whitelist igrača s rolama (doc ID = nick)
+ *   config   → session doc (doc ID = "session")
+ *   players  → prijavljeni igrači (doc ID = player id)
+ *   history  → povijest rezultata (doc ID = auto)
+ *   ratings  → ocjene igrača (doc ID = auto)
+ *
+ * Javno sučelje ostaje identično — getteri, setteri, subscribe.
  */
 
 const DB = (() => {
 
+  // ── localStorage ključevi (fallback / cache) ────────────────────────────
   const KEYS = {
     users:   'nfg_users',
     session: 'nfg_session',
@@ -21,8 +25,7 @@ const DB = (() => {
     ratings: 'nfg_ratings',
   };
 
-  // Fallback seed podaci — koriste se kad fetch ne radi (file:// protokol)
-  // Na GitHub Pages fetch će učitati prave JSON datoteke iz /data/
+  // Fallback seed podaci
   const SEED_USERS = [
     { nick: 'LukaB',   role: 'admin', email: 'luka.b@gmail.com'   },
     { nick: 'Marko10', role: 'user',  email: 'marko10@gmail.com'  },
@@ -58,7 +61,7 @@ const DB = (() => {
   ];
 
   const DEFAULT_SESSION = {
-    status:     'closed', // 'closed' | 'open'
+    status:     'closed',
     date:       null,
     field:      'Velesajam 2',
     time:       '19–20h',
@@ -66,14 +69,30 @@ const DB = (() => {
     markerTeam: null,
   };
 
-  // ── Interni helpers ──────────────────────────────────────────────────────
+  // ── State ───────────────────────────────────────────────────────────────
 
-  function load(key) {
+  let _db = null;          // Firestore instance
+  let _useFirestore = false;
+  let _subscribers = [];   // callback funkcije za re-render
+  let _unsubscribers = []; // Firestore onSnapshot unsubscribe funkcije
+
+  // In-memory cache (populira se iz Firestore listenera ili localStorage)
+  let _cache = {
+    users:   null,
+    session: null,
+    players: null,
+    history: null,
+    ratings: null,
+  };
+
+  // ── localStorage helpers ────────────────────────────────────────────────
+
+  function lsLoad(key) {
     try   { return JSON.parse(localStorage.getItem(key)); }
     catch { return null; }
   }
 
-  function save(key, value) {
+  function lsSave(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
   }
 
@@ -88,58 +107,224 @@ const DB = (() => {
     }
   }
 
-  // ── Javno sučelje ────────────────────────────────────────────────────────
+  // ── Firestore helpers ───────────────────────────────────────────────────
+
+  function initFirestore() {
+    try {
+      if (typeof firebase === 'undefined' || !firebase.firestore) return false;
+      if (!firebase.apps.length) {
+        firebase.initializeApp(FIREBASE_CONFIG);
+      }
+      _db = firebase.firestore();
+      // Omogući offline persistence (radi i bez interneta)
+      _db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+        if (err.code !== 'failed-precondition' && err.code !== 'unimplemented') {
+          console.warn('Firestore persistence:', err);
+        }
+      });
+      return true;
+    } catch (e) {
+      console.warn('Firestore init neuspješan, koristim localStorage:', e);
+      return false;
+    }
+  }
+
+  // Seeda Firestore ako su kolekcije prazne
+  async function seedFirestore() {
+    // Users
+    const usersSnap = await _db.collection('users').limit(1).get();
+    if (usersSnap.empty) {
+      const users = await fetchJSON('data/users.json', SEED_USERS);
+      const batch = _db.batch();
+      users.forEach(u => {
+        batch.set(_db.collection('users').doc(u.nick), u);
+      });
+      await batch.commit();
+      console.info('DB: Firestore users seeded');
+    }
+
+    // Session
+    const sessionDoc = await _db.doc('config/session').get();
+    if (!sessionDoc.exists) {
+      await _db.doc('config/session').set(DEFAULT_SESSION);
+      console.info('DB: Firestore session seeded');
+    }
+
+    // History
+    const histSnap = await _db.collection('history').limit(1).get();
+    if (histSnap.empty) {
+      const history = await fetchJSON('data/history.json', SEED_HISTORY);
+      const batch = _db.batch();
+      history.forEach(h => {
+        batch.set(_db.collection('history').doc(), h);
+      });
+      await batch.commit();
+      console.info('DB: Firestore history seeded');
+    }
+
+    // Players i ratings — prazne kolekcije, ne treba seed
+  }
+
+  function notifySubscribers() {
+    _subscribers.forEach(fn => {
+      try { fn(); } catch (e) { console.error('DB subscriber error:', e); }
+    });
+  }
+
+  function setupListeners() {
+    // Users
+    _unsubscribers.push(
+      _db.collection('users').onSnapshot(snap => {
+        _cache.users = snap.docs.map(d => d.data());
+        lsSave(KEYS.users, _cache.users);
+        notifySubscribers();
+      })
+    );
+
+    // Session
+    _unsubscribers.push(
+      _db.doc('config/session').onSnapshot(doc => {
+        _cache.session = doc.exists ? doc.data() : { ...DEFAULT_SESSION };
+        lsSave(KEYS.session, _cache.session);
+        notifySubscribers();
+      })
+    );
+
+    // Players
+    _unsubscribers.push(
+      _db.collection('players').onSnapshot(snap => {
+        _cache.players = snap.docs.map(d => d.data());
+        lsSave(KEYS.players, _cache.players);
+        notifySubscribers();
+      })
+    );
+
+    // History — sortiraj po datumu desc
+    _unsubscribers.push(
+      _db.collection('history').orderBy('date', 'desc').onSnapshot(snap => {
+        _cache.history = snap.docs.map(d => d.data());
+        lsSave(KEYS.history, _cache.history);
+        notifySubscribers();
+      })
+    );
+
+    // Ratings
+    _unsubscribers.push(
+      _db.collection('ratings').onSnapshot(snap => {
+        _cache.ratings = snap.docs.map(d => d.data());
+        lsSave(KEYS.ratings, _cache.ratings);
+        notifySubscribers();
+      })
+    );
+  }
+
+  // ── localStorage-only init (fallback) ───────────────────────────────────
+
+  async function initLocalStorage() {
+    if (!lsLoad(KEYS.users)) {
+      const users = await fetchJSON('data/users.json', SEED_USERS);
+      lsSave(KEYS.users, users);
+    }
+    if (!lsLoad(KEYS.history)) {
+      const history = await fetchJSON('data/history.json', SEED_HISTORY);
+      lsSave(KEYS.history, history);
+    }
+    if (!lsLoad(KEYS.session)) {
+      lsSave(KEYS.session, DEFAULT_SESSION);
+    }
+    if (!lsLoad(KEYS.players)) {
+      lsSave(KEYS.players, []);
+    }
+    if (!lsLoad(KEYS.ratings)) {
+      lsSave(KEYS.ratings, []);
+    }
+
+    // Popuni cache iz localStorage
+    _cache.users   = lsLoad(KEYS.users);
+    _cache.session = lsLoad(KEYS.session);
+    _cache.players = lsLoad(KEYS.players);
+    _cache.history = lsLoad(KEYS.history);
+    _cache.ratings = lsLoad(KEYS.ratings);
+  }
+
+  // ── Javno sučelje ──────────────────────────────────────────────────────
 
   return {
 
-    /**
-     * Inicijalizacija — poziva se jednom na startu.
-     * Puni localStorage iz JSON datoteka (ili seed fallbacka) ako je prazan.
-     */
     async init() {
-      if (!load(KEYS.users)) {
-        const users = await fetchJSON('data/users.json', SEED_USERS);
-        save(KEYS.users, users);
-      }
-      if (!load(KEYS.history)) {
-        const history = await fetchJSON('data/history.json', SEED_HISTORY);
-        save(KEYS.history, history);
-      }
-      if (!load(KEYS.session)) {
-        save(KEYS.session, DEFAULT_SESSION);
-      }
-      if (!load(KEYS.players)) {
-        save(KEYS.players, []);
-      }
-      if (!load(KEYS.ratings)) {
-        save(KEYS.ratings, []);
+      _useFirestore = initFirestore();
+
+      if (_useFirestore) {
+        // Popuni cache iz localStorage odmah (brz start dok Firestore učitava)
+        _cache.users   = lsLoad(KEYS.users)   ?? SEED_USERS;
+        _cache.session = lsLoad(KEYS.session) ?? { ...DEFAULT_SESSION };
+        _cache.players = lsLoad(KEYS.players) ?? [];
+        _cache.history = lsLoad(KEYS.history) ?? [];
+        _cache.ratings = lsLoad(KEYS.ratings) ?? [];
+
+        await seedFirestore();
+        setupListeners();
+        console.info('DB: Firestore inicijaliziran s real-time listenerima');
+      } else {
+        await initLocalStorage();
+        console.info('DB: localStorage fallback');
       }
     },
 
-    // ── Getteri ────────────────────────────────────────────────────────────
+    // ── Getteri (čitaju iz in-memory cachea) ──────────────────────────────
 
-    getUsers()   { return load(KEYS.users)   ?? SEED_USERS; },
-    getSession() { return load(KEYS.session) ?? { ...DEFAULT_SESSION }; },
-    getPlayers() { return load(KEYS.players) ?? []; },
-    getHistory() { return load(KEYS.history) ?? []; },
-    getRatings() { return load(KEYS.ratings) ?? []; },
+    getUsers()   { return _cache.users   ?? SEED_USERS; },
+    getSession() { return _cache.session ?? { ...DEFAULT_SESSION }; },
+    getPlayers() { return _cache.players ?? []; },
+    getHistory() { return _cache.history ?? []; },
+    getRatings() { return _cache.ratings ?? []; },
 
-    // ── Setteri ────────────────────────────────────────────────────────────
+    // ── Setteri ───────────────────────────────────────────────────────────
 
-    saveSession(s) { save(KEYS.session, s); },
-    savePlayers(p) { save(KEYS.players, p); },
+    saveSession(s) {
+      _cache.session = s;
+      lsSave(KEYS.session, s);
+      if (_useFirestore) {
+        _db.doc('config/session').set(s).catch(e => console.error('saveSession:', e));
+      }
+    },
+
+    savePlayers(p) {
+      _cache.players = p;
+      lsSave(KEYS.players, p);
+      if (_useFirestore) {
+        // Batch: obriši sve pa postavi nove
+        const col = _db.collection('players');
+        col.get().then(snap => {
+          const batch = _db.batch();
+          snap.docs.forEach(d => batch.delete(d.ref));
+          p.forEach(player => {
+            batch.set(col.doc(player.id), player);
+          });
+          return batch.commit();
+        }).catch(e => console.error('savePlayers:', e));
+      }
+    },
 
     addResult(result) {
       const history = this.getHistory();
       history.unshift(result);
-      save(KEYS.history, history);
+      _cache.history = history;
+      lsSave(KEYS.history, history);
+      if (_useFirestore) {
+        _db.collection('history').add(result).catch(e => console.error('addResult:', e));
+      }
       return history;
     },
 
     addRating(rating) {
       const ratings = this.getRatings();
       ratings.push(rating);
-      save(KEYS.ratings, ratings);
+      _cache.ratings = ratings;
+      lsSave(KEYS.ratings, ratings);
+      if (_useFirestore) {
+        _db.collection('ratings').add(rating).catch(e => console.error('addRating:', e));
+      }
     },
 
     hasRated(matchDate, rater, rated) {
@@ -161,14 +346,49 @@ const DB = (() => {
       return avgs;
     },
 
-    // ── Dev alat: resetira sve na seed podatke ─────────────────────────────
-    // Pozovi iz konzole: DB.reset()
+    // ── Real-time subscribe ──────────────────────────────────────────────
+
+    /**
+     * Registriraj callback koji se poziva kad se bilo koji podatak promijeni.
+     * Koristi se umjesto pollinga — Firestore listeneri triggeraju ovo automatski.
+     */
+    subscribe(fn) {
+      if (typeof fn === 'function') _subscribers.push(fn);
+    },
+
+    unsubscribe(fn) {
+      _subscribers = _subscribers.filter(f => f !== fn);
+    },
+
+    // ── Dev alat ─────────────────────────────────────────────────────────
+
     async reset() {
+      // Unsubscribe listenere
+      _unsubscribers.forEach(unsub => unsub());
+      _unsubscribers = [];
+
+      // Očisti localStorage
       Object.values(KEYS).forEach(k => localStorage.removeItem(k));
+
+      if (_useFirestore) {
+        // Obriši Firestore kolekcije
+        const collections = ['users', 'players', 'history', 'ratings'];
+        for (const col of collections) {
+          const snap = await _db.collection(col).get();
+          const batch = _db.batch();
+          snap.docs.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+        }
+        // Obriši session doc
+        await _db.doc('config/session').delete();
+      }
+
       await this.init();
       console.info('DB resetiran na seed podatke. Refreshaj stranicu.');
     },
 
+    // Exposed za debug
+    isFirestore() { return _useFirestore; },
   };
 
 })();
