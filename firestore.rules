@@ -23,10 +23,13 @@ service cloud.firestore {
 
     // ── users kolekcija (doc ID = email) ─────────────────────────────
     // Čitanje: autentificirani (trebaju provjeriti sebe za whitelist).
-    // Pisanje: samo admini.
+    // Pisanje: admini mogu sve; korisnik može update-ati samo svoj doc (nick polje).
     match /users/{email} {
       allow read:  if isAuth();
       allow write: if isAdmin();
+      allow update: if isAuth() &&
+        request.auth.token.email == email &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nick']);
     }
 
     // ── config/session ───────────────────────────────────────────────

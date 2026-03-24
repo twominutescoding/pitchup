@@ -7,8 +7,8 @@
     default-src 'none';
     script-src 'self' https://www.gstatic.com/firebasejs/ https://accounts.google.com/gsi/;
     style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/;
-    connect-src https://firestore.googleapis.com https://*.firebaseio.com https://www.googleapis.com https://www.gstatic.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://accounts.google.com/;
-    img-src 'self' https://*.googleusercontent.com data:;
+    connect-src http://localhost:* https://firestore.googleapis.com https://*.firebaseio.com https://www.googleapis.com https://www.gstatic.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://accounts.google.com/;
+    img-src 'self' https://*.googleusercontent.com https://*.ggpht.com https://*.google.com data:;
     frame-src https://accounts.google.com/;
     font-src 'self';
     base-uri 'self';
@@ -33,18 +33,22 @@
 
         <!-- Google user pill (prikazan kad si ulogiran) -->
         <div class="user-pill hidden" id="google-user-pill">
-          <img class="user-pill-photo" id="google-avatar" src="" alt="">
-          <span id="google-nick"></span>
-          <span id="google-role-badge" class="role-badge role-user"></span>
+          <span class="user-pill-profile" data-action="open-my-profile">
+            <img class="user-pill-photo" id="google-avatar" src="" alt="">
+            <span id="google-nick"></span>
+            <span id="google-role-badge" class="role-badge role-user"></span>
+          </span>
           <button class="btn-logout" data-action="logout" title="Odjava">✕</button>
         </div>
 
         <!-- Mock user pill (za dev/testiranje) -->
-        <div class="mock-user-pill hidden" id="mock-user-pill" title="Demo: klikni za promjenu korisnika" data-action="next-mock-user">
-          <span class="mock-user-avatar" id="mock-avatar">L</span>
-          <span id="mock-nick">LukaB</span>
-          <span id="mock-role-badge" class="role-badge role-admin">ADMIN</span>
-          <span class="mock-tag">demo</span>
+        <div class="mock-user-pill hidden" id="mock-user-pill">
+          <span class="mock-pill-profile" data-action="open-my-profile" title="Moj profil">
+            <span class="mock-user-avatar" id="mock-avatar">L</span>
+            <span id="mock-nick">LukaB</span>
+            <span id="mock-role-badge" class="role-badge role-admin">ADMIN</span>
+          </span>
+          <span class="mock-tag" data-action="next-mock-user" title="Demo: promijeni korisnika">demo</span>
         </div>
       </div>
     </div>
@@ -310,6 +314,7 @@
           </svg>
         </div>
         <p id="pitch-hint" class="pitch-hint">Žrijebaj timove kako bi vidio raspored igrača na terenu.</p>
+        <div id="team-comparison" class="team-comparison hidden"></div>
       </div>
     </div>
 
@@ -334,6 +339,17 @@
         <h2 id="rating-modal-title">Ocijeni igrače</h2>
       </div>
       <div id="rating-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Overlay: moj profil -->
+  <div id="my-profile" class="overlay-tab hidden">
+    <div class="overlay-tab-inner">
+      <div class="history-tab-header">
+        <button class="btn-back" data-action="close-my-profile">← Natrag</button>
+        <h2>Moj profil</h2>
+      </div>
+      <div id="my-profile-body"></div>
     </div>
   </div>
 

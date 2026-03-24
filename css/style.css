@@ -1466,6 +1466,105 @@ main {
   text-align: right;
 }
 
+/* ── My profile edit form ──────────────────────────────── */
+.user-pill-profile,
+.mock-pill-profile {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.user-pill-profile:hover,
+.mock-pill-profile:hover { opacity: 0.75; }
+
+.prof-avatar-img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.my-prof-nick-row {
+  margin-bottom: 16px;
+}
+
+.my-prof-nick-label {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.my-prof-nick-form {
+  display: flex;
+  gap: 8px;
+}
+
+.my-prof-nick-input {
+  flex: 1;
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  font-weight: 600;
+  transition: border-color 0.15s;
+}
+.my-prof-nick-input:focus { outline: none; border-color: var(--green-hl); }
+
+.my-prof-note {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  min-height: 14px;
+  color: var(--muted);
+}
+.my-prof-note.error   { color: #e06060; }
+.my-prof-note.success { color: #5ec05e; }
+
+.my-prof-stats {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.my-prof-stat {
+  flex: 1;
+  min-width: 48px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.my-prof-stat-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.my-prof-stat-val {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.my-prof-w { color: #5ec05e; }
+.my-prof-l { color: #e06060; }
+.my-prof-pts { color: var(--gold-hl); }
+
 /* ── Right panel / pitch ──────────────────────────────── */
 .right-panel {
   display: flex;
@@ -1504,6 +1603,84 @@ main {
   font-size: 0.75rem;
   color: var(--muted);
 }
+
+/* ── Team comparison ──────────────────────────────────── */
+.team-comparison {
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.tc-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.tc-team {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.tc-team-a { color: var(--gold-hl); }
+.tc-team-b { color: var(--blue-hl); }
+
+.tc-vs {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+
+.tc-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+}
+
+.tc-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--muted);
+  min-width: 36px;
+  text-align: right;
+}
+
+.tc-val {
+  font-size: 0.72rem;
+  font-weight: 800;
+  min-width: 28px;
+}
+.tc-val-a { text-align: right; color: var(--gold-hl); }
+.tc-val-b { text-align: left; color: var(--blue-hl); }
+
+.tc-bars {
+  flex: 1;
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tc-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.tc-bar-wrap-a { direction: rtl; }
+
+.tc-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.tc-bar-a { background: var(--gold); }
+.tc-bar-b { background: var(--blue); }
 
 /* ── Mobile ───────────────────────────────────────────── */
 @media (max-width: 680px) {
@@ -1598,6 +1775,11 @@ main {
   .stats-table { font-size: 0.78rem; }
   .stats-table th { font-size: 0.62rem; padding: 8px 3px; }
   .stats-table td { padding: 10px 3px; }
+
+  /* My profile */
+  .my-prof-nick-input { padding: 10px 12px; min-height: 44px; }
+  .my-prof-stats { gap: 6px; }
+  .my-prof-stat { padding: 8px 6px; }
 
   /* Pitch ispod svega */
   .right-panel { order: 1; }

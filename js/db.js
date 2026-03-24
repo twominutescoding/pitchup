@@ -129,40 +129,24 @@ const DB = (() => {
     }
   }
 
-  // Seeda Firestore ako su kolekcije prazne
+  // Seeda Firestore ako su kolekcije prazne — kreira samo admin usera i praznu sesiju
   async function seedFirestore() {
-    // Users
+    // Users — samo jedan admin ako je baza prazna
     const usersSnap = await _db.collection('users').limit(1).get();
     if (usersSnap.empty) {
-      const users = await fetchJSON('data/users.json', SEED_USERS);
-      const batch = _db.batch();
-      users.forEach(u => {
-        batch.set(_db.collection('users').doc(u.email), u);
-      });
-      await batch.commit();
-      console.info('DB: Firestore users seeded');
+      const admin = { nick: 'TestAdmin', role: 'admin', email: 'test@test.com' };
+      await _db.collection('users').doc(admin.email).set(admin);
+      console.info('DB: Firestore users seeded (admin)');
     }
 
-    // Session
+    // Session — default zatvorena sesija
     const sessionDoc = await _db.doc('config/session').get();
     if (!sessionDoc.exists) {
       await _db.doc('config/session').set(DEFAULT_SESSION);
       console.info('DB: Firestore session seeded');
     }
 
-    // History
-    const histSnap = await _db.collection('history').limit(1).get();
-    if (histSnap.empty) {
-      const history = await fetchJSON('data/history.json', SEED_HISTORY);
-      const batch = _db.batch();
-      history.forEach(h => {
-        batch.set(_db.collection('history').doc(), h);
-      });
-      await batch.commit();
-      console.info('DB: Firestore history seeded');
-    }
-
-    // Players i ratings — prazne kolekcije, ne treba seed
+    // History, players, ratings — ostaju prazne
   }
 
   function notifySubscribers() {
@@ -342,6 +326,25 @@ const DB = (() => {
       lsSave(KEYS.ratings, ratings);
       if (_useFirestore) {
         _db.collection('ratings').add(rating).catch(e => console.error('addRating:', e));
+      }
+    },
+
+    updateUser(email, data) {
+      // Samo nick se može mijenjati
+      const allowed = { nick: data.nick };
+      if (!allowed.nick) return;
+
+      // Ažuriraj cache
+      const user = (_cache.users || []).find(u => u.email === email);
+      if (user) {
+        user.nick = allowed.nick;
+        lsSave(KEYS.users, _cache.users);
+      }
+
+      // Ažuriraj Firestore
+      if (_useFirestore) {
+        _db.collection('users').doc(email).update(allowed)
+          .catch(e => console.error('updateUser:', e));
       }
     },
 

@@ -53,9 +53,20 @@ function sessionOpen()  { return state.session.status === 'open'; }
 
 function getActiveCount() {
   const n = state.players.length;
-  if (n >= 10) return 10;
-  if (n >= 8)  return 8;
-  return 0;
+  if (n < 2) return 0;
+  return n % 2 === 0 ? n : n - 1;
+}
+
+// ── resolveNick — email→nick lookup za history podatke ─────────────────────
+
+function resolveNick(nameOrEmail) {
+  if (!nameOrEmail) return '';
+  // Ako izgleda kao email, potraži u users listi
+  if (nameOrEmail.includes('@')) {
+    const user = state.users.find(u => u.email === nameOrEmail);
+    return user ? user.nick : nameOrEmail;
+  }
+  return nameOrEmail;
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
@@ -278,6 +289,9 @@ function bootApp() {
         case 'hide-history':     hideHistoryTab(); break;
         case 'close-rating':     closeRatingModal(); break;
         case 'close-profile':    closePlayerProfile(); break;
+        case 'open-my-profile':  openMyProfile(); break;
+        case 'close-my-profile': closeMyProfile(); break;
+        case 'save-my-profile':  saveMyProfile(); break;
       }
       return;
     }
@@ -428,8 +442,14 @@ function submitResult() {
     time:   state.session.time,
     scoreA,
     scoreB,
-    teamA:  state.players.filter(p => p.team === 'a').map(p => p.name),
-    teamB:  state.players.filter(p => p.team === 'b').map(p => p.name),
+    teamA:  state.players.filter(p => p.team === 'a').map(p => {
+      const user = state.users.find(u => u.nick === p.name);
+      return user ? user.email : p.name;
+    }),
+    teamB:  state.players.filter(p => p.team === 'b').map(p => {
+      const user = state.users.find(u => u.nick === p.name);
+      return user ? user.email : p.name;
+    }),
   };
 
   DB.addResult(result);
@@ -575,7 +595,7 @@ function renderPlayers() {
 
   badge.textContent = count;
   badge.className   = activeN > 0 ? 'badge full' : 'badge';
-  drawBtn.classList.toggle('hidden', !isAdmin() || count < 8);
+  drawBtn.classList.toggle('hidden', !isAdmin() || count < 2);
 
   if (state.session.teamsDrawn) {
     legend.classList.remove('hidden');
@@ -680,17 +700,34 @@ function renderPitch() {
     hint.textContent = isAdmin()
       ? 'Žrijebaj timove kako bi rasporedio igrače na teren.'
       : 'Admin će napraviti žrijeb kad se skupi dovoljno igrača.';
+    document.getElementById('team-comparison').classList.add('hidden');
     return;
   }
 
   const teamA = state.players.filter(p => p.team === 'a');
   const teamB = state.players.filter(p => p.team === 'b');
-  const pos   = POSITIONS[teamA.length] || POSITIONS[5];
+  const pos   = POSITIONS[teamA.length] || generatePositions(teamA.length);
 
-  teamA.forEach((p, i) => { if (i < pos.a.length) drawPlayerMarker(container, p, pos.a[i].x, pos.a[i].y, 'rg-gold'); });
-  teamB.forEach((p, i) => { if (i < pos.b.length) drawPlayerMarker(container, p, pos.b[i].x, pos.b[i].y, 'rg-blue'); });
+  const history = DB.getHistory();
+  const allStats = calcPlayerStats(history);
+
+  function getStatsText(player) {
+    const overall = getPlayerOverall(player.name);
+    const form = calcPlayerForm(player.name);
+    const ps = allStats.find(s => s.name === player.name);
+    let parts = [];
+    if (overall != null) parts.push(`★${overall.toFixed(1)}`);
+    if (form >= 1.8) parts.push(formIcon(form));
+    if (ps) parts.push(`${ps.w}W-${ps.l}L`);
+    return parts.join(' ');
+  }
+
+  teamA.forEach((p, i) => { if (i < pos.a.length) drawPlayerMarker(container, p, pos.a[i].x, pos.a[i].y, 'rg-gold', getStatsText(p)); });
+  teamB.forEach((p, i) => { if (i < pos.b.length) drawPlayerMarker(container, p, pos.b[i].x, pos.b[i].y, 'rg-blue', getStatsText(p)); });
 
   hint.textContent = `${state.session.markerTeam === 'a' ? 'Tim A' : 'Tim B'} donosi markere.`;
+
+  renderTeamComparison(teamA, teamB, allStats);
 }
 
 function renderUnassigned(container, players) {
@@ -704,7 +741,7 @@ function renderUnassigned(container, players) {
   });
 }
 
-function drawPlayerMarker(container, player, x, y, gradId) {
+function drawPlayerMarker(container, player, x, y, gradId, statsText) {
   const g = svgEl('g');
 
   const shadow = svgEl('ellipse');
@@ -731,16 +768,19 @@ function drawPlayerMarker(container, player, x, y, gradId) {
   shine.setAttribute('fill', 'rgba(255,255,255,0.30)');
   shine.setAttribute('transform', `rotate(-25,${x - 3},${y - 3.5})`);
 
+  const hasStats = statsText && statsText.length > 0;
   const name = trunc(player.name, 8);
-  const lw   = Math.max(26, name.length * 5.0 + 8);
+  const statsW = hasStats ? Math.max(0, statsText.length * 4.2 + 8) : 0;
+  const lw   = Math.max(26, name.length * 5.0 + 8, statsW);
   const lx   = x - lw / 2;
   const ly   = y + 12;
+  const lh   = hasStats ? 21 : 11;
 
   const labelBg = svgEl('rect');
   labelBg.setAttribute('x', lx);
   labelBg.setAttribute('y', ly);
   labelBg.setAttribute('width', lw);
-  labelBg.setAttribute('height', 11);
+  labelBg.setAttribute('height', lh);
   labelBg.setAttribute('rx', '5.5');
   labelBg.setAttribute('fill', 'rgba(0,0,0,0.65)');
 
@@ -759,6 +799,20 @@ function drawPlayerMarker(container, player, x, y, gradId) {
   g.appendChild(shine);
   g.appendChild(labelBg);
   g.appendChild(text);
+
+  if (hasStats) {
+    const statsEl = svgEl('text');
+    statsEl.setAttribute('x', x);
+    statsEl.setAttribute('y', ly + 17);
+    statsEl.setAttribute('text-anchor', 'middle');
+    statsEl.setAttribute('fill', 'rgba(255,255,200,0.80)');
+    statsEl.setAttribute('font-size', '5.5');
+    statsEl.setAttribute('font-weight', '600');
+    statsEl.setAttribute('font-family', '-apple-system,Helvetica,sans-serif');
+    statsEl.textContent = statsText;
+    g.appendChild(statsEl);
+  }
+
   container.appendChild(g);
 }
 
@@ -769,8 +823,8 @@ function historyItemCompact(m) {
   const diff     = m.scoreA - m.scoreB;
   const outcome  = diff > 0 ? 'win-a' : diff < 0 ? 'win-b' : 'draw';
   const label    = diff > 0 ? 'Tim A pobijedio' : diff < 0 ? 'Tim B pobijedio' : 'Neriješeno';
-  const playersA = (m.teamA || []).map(escHtml).join(', ') || '—';
-  const playersB = (m.teamB || []).map(escHtml).join(', ') || '—';
+  const playersA = (m.teamA || []).map(n => escHtml(resolveNick(n))).join(', ') || '—';
+  const playersB = (m.teamB || []).map(n => escHtml(resolveNick(n))).join(', ') || '—';
   return `
     <div class="history-item">
       <div class="history-meta">${escHtml(date)} · ${escHtml(m.field)} · ${escHtml(m.time)}</div>
@@ -794,8 +848,8 @@ function historyItemFull(m) {
   const diff     = m.scoreA - m.scoreB;
   const outcome  = diff > 0 ? 'win-a' : diff < 0 ? 'win-b' : 'draw';
   const label    = diff > 0 ? 'Tim A pobijedio' : diff < 0 ? 'Tim B pobijedio' : 'Neriješeno';
-  const teamA    = (m.teamA || []);
-  const teamB    = (m.teamB || []);
+  const teamA    = (m.teamA || []).map(resolveNick);
+  const teamB    = (m.teamB || []).map(resolveNick);
   return `
     <div class="hf-card">
       <div class="hf-header">
@@ -841,14 +895,16 @@ function calcPlayerStats(history) {
   const stats = {};
   history.forEach(m => {
     const diff = m.scoreA - m.scoreB;
-    (m.teamA || []).forEach(name => {
+    (m.teamA || []).forEach(raw => {
+      const name = resolveNick(raw);
       if (!stats[name]) stats[name] = { w: 0, d: 0, l: 0, gp: 0 };
       stats[name].gp++;
       if (diff > 0) stats[name].w++;
       else if (diff === 0) stats[name].d++;
       else stats[name].l++;
     });
-    (m.teamB || []).forEach(name => {
+    (m.teamB || []).forEach(raw => {
+      const name = resolveNick(raw);
       if (!stats[name]) stats[name] = { w: 0, d: 0, l: 0, gp: 0 };
       stats[name].gp++;
       if (diff < 0) stats[name].w++;
@@ -867,7 +923,7 @@ function calcPlayerForm(name) {
   const DECAY   = 42; // 6 tjedana u danima
   let score = 0;
   history.forEach(m => {
-    const allPlayers = [...(m.teamA || []), ...(m.teamB || [])];
+    const allPlayers = [...(m.teamA || []), ...(m.teamB || [])].map(resolveNick);
     if (!allPlayers.includes(name)) return;
     const daysAgo = (now - new Date(m.date).getTime()) / 86400000;
     score += Math.max(0, 1 - daysAgo / DECAY);
@@ -984,7 +1040,7 @@ function openRatingModal(matchDate) {
   const match   = history.find(m => m.date === matchDate);
   if (!match) return;
 
-  const allPlayers = [...(match.teamA || []), ...(match.teamB || [])];
+  const allPlayers = [...(match.teamA || []), ...(match.teamB || [])].map(resolveNick);
   const me = currentNick();
   if (!allPlayers.includes(me)) {
     alert('Nisi sudjelovao u ovoj utakmici.');
@@ -1203,6 +1259,252 @@ function renderRadarChart(avgs) {
     }).join('')}
     ${labels}
   </svg>`;
+}
+
+// ── My profile ────────────────────────────────────────────────────────────
+
+function openMyProfile() {
+  const user = currentUser();
+  const nick = user.nick;
+  const email = user.email || '';
+  const body = document.getElementById('my-profile-body');
+
+  // Avatar
+  const isGoogle = state.authMode === 'google' && state.googleUser;
+  const avatarHtml = isGoogle && state.googleUser.picture
+    ? `<img class="prof-avatar-img" src="${escAttr(state.googleUser.picture)}" alt="">`
+    : `<div class="prof-avatar">${escHtml(nick.charAt(0).toUpperCase())}</div>`;
+
+  // Stats
+  const history = DB.getHistory();
+  const allStats = calcPlayerStats(history);
+  const myStats = allStats.find(s => s.name === nick);
+
+  let statsHtml = '';
+  if (myStats) {
+    statsHtml = `
+      <div class="my-prof-stats">
+        <div class="my-prof-stat"><span class="my-prof-stat-label">GP</span><span class="my-prof-stat-val">${myStats.gp}</span></div>
+        <div class="my-prof-stat"><span class="my-prof-stat-label">W</span><span class="my-prof-stat-val my-prof-w">${myStats.w}</span></div>
+        <div class="my-prof-stat"><span class="my-prof-stat-label">D</span><span class="my-prof-stat-val">${myStats.d}</span></div>
+        <div class="my-prof-stat"><span class="my-prof-stat-label">L</span><span class="my-prof-stat-val my-prof-l">${myStats.l}</span></div>
+        <div class="my-prof-stat"><span class="my-prof-stat-label">Bod</span><span class="my-prof-stat-val my-prof-pts">${myStats.pts}</span></div>
+      </div>`;
+  }
+
+  // Form (forma)
+  const form = calcPlayerForm(nick);
+  const formHtml = `
+    <div class="prof-form-row">
+      <div class="prof-form-info">
+        <span class="prof-form-label">Forma ${formIcon(form)}</span>
+        <span class="prof-form-desc">${formLabel(form)}</span>
+      </div>
+      <div class="prof-form-bar-wrap">
+        <div class="prof-form-bar" style="width:${(form / 5) * 100}%;background:${formColor(form)}"></div>
+      </div>
+      <span class="prof-form-val" style="color:${formColor(form)}">${form.toFixed(1)}</span>
+    </div>`;
+
+  // Radar chart
+  const avgs = DB.getPlayerAvgRatings(nick);
+  let radarHtml = '';
+  if (avgs) {
+    radarHtml = `
+      <div class="prof-radar-wrap">${renderRadarChart(avgs)}</div>
+      <div class="prof-stats">
+        ${RATING_CATS.map(c =>
+          `<div class="prof-stat-row">
+            <span class="prof-stat-label">${c.label}</span>
+            <div class="prof-stat-bar-wrap">
+              <div class="prof-stat-bar" style="width:${(avgs[c.key] / 5) * 100}%"></div>
+            </div>
+            <span class="prof-stat-val">${avgs[c.key].toFixed(1)}</span>
+          </div>`
+        ).join('')}
+      </div>`;
+  }
+
+  body.innerHTML = `
+    <div class="prof-card">
+      <div class="prof-header">
+        ${avatarHtml}
+        <div class="prof-info">
+          <div class="prof-meta">${escHtml(email)}</div>
+        </div>
+      </div>
+      <div class="my-prof-nick-row">
+        <label class="my-prof-nick-label">Nick</label>
+        <div class="my-prof-nick-form">
+          <input type="text" id="my-prof-nick-input" class="my-prof-nick-input" value="${escAttr(nick)}" maxlength="20">
+          <button class="btn-admin" data-action="save-my-profile">Spremi</button>
+        </div>
+        <p class="my-prof-note" id="my-prof-note"></p>
+      </div>
+      ${statsHtml}
+      ${formHtml}
+      ${radarHtml}
+    </div>`;
+
+  document.getElementById('my-profile').classList.remove('hidden');
+}
+
+function closeMyProfile() {
+  document.getElementById('my-profile').classList.add('hidden');
+}
+
+function saveMyProfile() {
+  const input = document.getElementById('my-prof-nick-input');
+  const note = document.getElementById('my-prof-note');
+  const newNick = (input.value || '').trim();
+
+  if (!newNick) {
+    note.textContent = 'Nick ne može biti prazan.';
+    note.className = 'my-prof-note error';
+    return;
+  }
+
+  if (newNick.length > 20) {
+    note.textContent = 'Nick može imati max 20 znakova.';
+    note.className = 'my-prof-note error';
+    return;
+  }
+
+  const user = currentUser();
+  const oldNick = user.nick;
+
+  // Provjeri duplikat
+  if (newNick !== oldNick && state.users.some(u => u.nick === newNick)) {
+    note.textContent = 'Taj nick je već zauzet.';
+    note.className = 'my-prof-note error';
+    return;
+  }
+
+  if (newNick === oldNick) {
+    note.textContent = 'Ništa za promijeniti.';
+    note.className = 'my-prof-note';
+    return;
+  }
+
+  // Ažuriraj DB
+  DB.updateUser(user.email, { nick: newNick });
+
+  // Ažuriraj in-memory state
+  state.users = DB.getUsers();
+
+  // Ažuriraj prijavljene igrače ako je user prijavljen
+  const playerEntry = state.players.find(p => p.name === oldNick);
+  if (playerEntry) {
+    playerEntry.name = newNick;
+    DB.savePlayers(state.players);
+  }
+
+  // Ažuriraj header UI
+  if (state.authMode === 'google') {
+    document.getElementById('google-nick').textContent = newNick;
+  } else {
+    document.getElementById('mock-nick').textContent = newNick;
+    document.getElementById('mock-avatar').textContent = newNick.charAt(0).toUpperCase();
+  }
+  document.getElementById('reg-nick').textContent = newNick;
+  document.getElementById('reg-avatar').textContent = newNick.charAt(0).toUpperCase();
+
+  note.textContent = 'Nick spremljen!';
+  note.className = 'my-prof-note success';
+  clearTimeout(note._t);
+  note._t = setTimeout(() => { note.textContent = ''; note.className = 'my-prof-note'; }, 3000);
+
+  render();
+  renderHistory();
+}
+
+// ── Team comparison ────────────────────────────────────────────────────────
+
+function renderTeamComparison(teamA, teamB, allStats) {
+  const el = document.getElementById('team-comparison');
+
+  function teamAgg(players) {
+    let gp = 0, w = 0, d = 0, l = 0, pts = 0, ratingSum = 0, ratingCount = 0, formSum = 0;
+    players.forEach(p => {
+      const s = allStats.find(st => st.name === p.name);
+      if (s) { gp += s.gp; w += s.w; d += s.d; l += s.l; pts += s.pts; }
+      const ov = getPlayerOverall(p.name);
+      if (ov != null) { ratingSum += ov; ratingCount++; }
+      formSum += calcPlayerForm(p.name);
+    });
+    return {
+      gp, w, d, l, pts,
+      rating: ratingCount > 0 ? ratingSum / ratingCount : null,
+      form: players.length > 0 ? formSum / players.length : 0,
+    };
+  }
+
+  const a = teamAgg(teamA);
+  const b = teamAgg(teamB);
+
+  const rows = [
+    { label: 'GP',   va: a.gp,  vb: b.gp },
+    { label: 'W',    va: a.w,   vb: b.w },
+    { label: 'D',    va: a.d,   vb: b.d },
+    { label: 'L',    va: a.l,   vb: b.l },
+    { label: 'Bod',  va: a.pts, vb: b.pts },
+    { label: '★',    va: a.rating, vb: b.rating, decimal: true },
+    { label: 'Forma', va: a.form, vb: b.form, decimal: true, icon: true },
+  ];
+
+  let html = `<div class="tc-header">
+    <span class="tc-team tc-team-a">Tim A</span>
+    <span class="tc-vs">VS</span>
+    <span class="tc-team tc-team-b">Tim B</span>
+  </div>`;
+
+  rows.forEach(r => {
+    const va = r.va != null ? r.va : 0;
+    const vb = r.vb != null ? r.vb : 0;
+    const max = Math.max(va, vb, 0.1);
+    const pctA = (va / max) * 100;
+    const pctB = (vb / max) * 100;
+    const fmtA = r.decimal ? (r.va != null ? r.va.toFixed(1) : '–') : va;
+    const fmtB = r.decimal ? (r.vb != null ? r.vb.toFixed(1) : '–') : vb;
+    const iconA = r.icon ? ' ' + formIcon(va) : '';
+    const iconB = r.icon ? ' ' + formIcon(vb) : '';
+
+    html += `<div class="tc-row">
+      <span class="tc-label">${r.label}</span>
+      <span class="tc-val tc-val-a">${fmtA}${iconA}</span>
+      <div class="tc-bars">
+        <div class="tc-bar-wrap tc-bar-wrap-a"><div class="tc-bar tc-bar-a" style="width:${pctA}%"></div></div>
+        <div class="tc-bar-wrap tc-bar-wrap-b"><div class="tc-bar tc-bar-b" style="width:${pctB}%"></div></div>
+      </div>
+      <span class="tc-val tc-val-b">${fmtB}${iconB}</span>
+    </div>`;
+  });
+
+  el.innerHTML = html;
+  el.classList.remove('hidden');
+}
+
+// ── Dynamic pitch positions ────────────────────────────────────────────────
+
+function generatePositions(n) {
+  const positions = { a: [], b: [] };
+  if (n <= 0) return positions;
+  if (n === 1) {
+    positions.a = [{ x: 125, y: 160 }];
+    positions.b = [{ x: 375, y: 160 }];
+    return positions;
+  }
+  // GK + outfield spread vertically
+  positions.a.push({ x: 33, y: 160 });
+  positions.b.push({ x: 467, y: 160 });
+  const outfield = n - 1;
+  for (let i = 0; i < outfield; i++) {
+    const ySpread = 240 / (outfield + 1);
+    const y = 40 + ySpread * (i + 1);
+    positions.a.push({ x: 100 + (i % 2) * 60, y });
+    positions.b.push({ x: 400 - (i % 2) * 60, y });
+  }
+  return positions;
 }
 
 // ── Utils ──────────────────────────────────────────────────────────────────
