@@ -321,24 +321,53 @@ seedati podatke iz `data/users.json` ili hardkodiranih seed podataka.
 
 ### Korak 10: Zaštiti bazu (Security Rules)
 
-Ovo napravi kad si gotov s testiranjem (ili kad istekne test mode za 30 dana):
+Ovo napravi kad si gotov s testiranjem (ili kad istekne test mode za 30 dana).
+
+#### Opcija A: Deploy putem Firebase CLI (preporučeno)
+
+1. Instaliraj Firebase CLI: `npm install -g firebase-tools`
+2. Prijavi se: `firebase login`
+3. U root direktoriju projekta već postoje `firebase.json`, `.firebaserc` i `firestore.rules`
+4. Deploy:
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
+
+#### Opcija B: Ručno u Firebase Console
 
 1. U Firebase Console → **"Firestore Database"** → tab **"Rules"**
-2. Zamijeni sadržaj s:
-   ```
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       match /{document=**} {
-         allow read, write: if request.auth != null;
-       }
-     }
-   }
-   ```
+2. Kopiraj sadržaj iz `firestore.rules` datoteke u projektu
 3. Klikni **"Publish"**
 
-Ovo znači: **samo ulogirani korisnici** mogu čitati i pisati.
-Neulogirani (botovi, random ljudi) ne mogu ništa.
+#### Kako pravila rade
+
+Pravila koriste **dvoslojnu zaštitu**:
+
+1. **Firebase Auth** — korisnik mora biti autentificiran putem Google OAuth-a
+2. **Email whitelist** — korisnikov email mora postojati u `allowedEmails` Firestore kolekciji
+
+Kolekcija `allowedEmails` se automatski seeda iz `users` kolekcije pri prvom pokretanju appa. Svaki dokument ima ID = email korisnika i sadrži `nick`, `role` i `email` polja.
+
+#### Pregled pravila po kolekcijama
+
+| Kolekcija | Čitanje | Pisanje |
+|-----------|---------|---------|
+| `users` | Whitelisted korisnici | Samo admini |
+| `allowedEmails` | Autentificirani (za self-check) | Samo admini |
+| `config` | Whitelisted korisnici | Samo admini |
+| `players` | Whitelisted korisnici | Whitelisted korisnici |
+| `history` | Whitelisted korisnici | Samo admini |
+| `ratings` | Whitelisted korisnici | Whitelisted (samo za sebe kao `rater`) |
+
+Ovo znači: **čak i da netko ima Firebase config, bez Google računa koji je u whitelisti, ne može ništa čitati ni pisati.**
+
+#### Dodavanje novog korisnika u whitelist
+
+Kad dodaješ novog korisnika, moraš ga dodati na **dva mjesta**:
+1. `users` kolekcija (za app logiku)
+2. `allowedEmails` kolekcija (za security rules) — doc ID = email
+
+Ili pozovi `DB.reset()` koji će automatski reseedati `allowedEmails` iz `users`.
 
 ---
 

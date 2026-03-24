@@ -22,6 +22,22 @@ const POSITIONS = {
   },
 };
 
+// ── Security helpers ───────────────────────────────────────────────────────
+
+function escHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escAttr(str) {
+  return escHtml(str);
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function currentUser() {
@@ -74,6 +90,10 @@ function showLoginScreen() {
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('main-content').classList.add('hidden');
 
+  // Sakrij dev mode gumb na produkciji
+  const devBtn = document.querySelector('.btn-dev-mode');
+  if (devBtn) devBtn.classList.toggle('hidden', !isLocalhost());
+
   const note = document.getElementById('login-note');
   note.textContent = '';
 
@@ -121,7 +141,7 @@ async function handleGoogleLogin(response) {
   const whitelisted = state.users.find(u => u.email === user.email);
   if (!whitelisted) {
     Auth.clear();
-    note.innerHTML = `<strong>${user.email}</strong> nije na popisu igrača.<br>Kontaktiraj admina za pristup.`;
+    note.innerHTML = `<strong>${escHtml(user.email)}</strong> nije na popisu igrača.<br>Kontaktiraj admina za pristup.`;
     note.classList.add('login-error');
     return;
   }
@@ -158,7 +178,16 @@ async function loginWithGoogle(googleUser) {
   bootApp();
 }
 
+function isLocalhost() {
+  const h = location.hostname;
+  return h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0' || h === '';
+}
+
 function enterDevMode() {
+  if (!isLocalhost()) {
+    console.warn('Dev mode dostupan samo na localhost.');
+    return;
+  }
   state.authMode = 'dev';
 
   document.getElementById('login-screen').classList.add('hidden');
@@ -214,6 +243,28 @@ function bootApp() {
 
   document.addEventListener('click', e => {
     if (!e.target.closest('.cs')) closeAllCs();
+
+    // Delegirani event listeneri za data-* atribute (umjesto inline onclick s interpolacijom)
+    const profileEl = e.target.closest('[data-profile]');
+    if (profileEl) {
+      openPlayerProfile(profileEl.dataset.profile);
+      return;
+    }
+    const matchDateEl = e.target.closest('[data-match-date]');
+    if (matchDateEl) {
+      openRatingModal(matchDateEl.dataset.matchDate);
+      return;
+    }
+    const ratePlayerEl = e.target.closest('[data-rate-player]');
+    if (ratePlayerEl) {
+      submitPlayerRating(ratePlayerEl.dataset.ratePlayer);
+      return;
+    }
+    const starEl = e.target.closest('.star[data-val]');
+    if (starEl) {
+      pickStar(starEl);
+      return;
+    }
   });
 }
 
@@ -264,7 +315,7 @@ function refreshAdminPanel() {
   const select     = document.getElementById('admin-player-select');
   select.innerHTML = available.length
     ? '<option value="">— odaberi —</option>' +
-      available.map(u => `<option value="${u.nick}">${u.nick}</option>`).join('')
+      available.map(u => `<option value="${escAttr(u.nick)}">${escHtml(u.nick)}</option>`).join('')
     : '<option value="">Svi su prijavljeni</option>';
 
   // Labele tima za formu rezultata
@@ -689,17 +740,17 @@ function historyItemCompact(m) {
   const diff     = m.scoreA - m.scoreB;
   const outcome  = diff > 0 ? 'win-a' : diff < 0 ? 'win-b' : 'draw';
   const label    = diff > 0 ? 'Tim A pobijedio' : diff < 0 ? 'Tim B pobijedio' : 'Neriješeno';
-  const playersA = (m.teamA || []).join(', ') || '—';
-  const playersB = (m.teamB || []).join(', ') || '—';
+  const playersA = (m.teamA || []).map(escHtml).join(', ') || '—';
+  const playersB = (m.teamB || []).map(escHtml).join(', ') || '—';
   return `
     <div class="history-item">
-      <div class="history-meta">${date} · ${m.field} · ${m.time}</div>
+      <div class="history-meta">${escHtml(date)} · ${escHtml(m.field)} · ${escHtml(m.time)}</div>
       <div class="history-score">
         <div class="hs-side">
           <span class="hs-team ${outcome === 'win-a' ? 'hs-winner' : ''}">Tim A</span>
           <span class="hs-players">${playersA}</span>
         </div>
-        <span class="hs-num">${m.scoreA} – ${m.scoreB}</span>
+        <span class="hs-num">${parseInt(m.scoreA) || 0} – ${parseInt(m.scoreB) || 0}</span>
         <div class="hs-side hs-side-right">
           <span class="hs-team ${outcome === 'win-b' ? 'hs-winner' : ''}">Tim B</span>
           <span class="hs-players">${playersB}</span>
@@ -719,24 +770,24 @@ function historyItemFull(m) {
   return `
     <div class="hf-card">
       <div class="hf-header">
-        <span class="hf-date">${date}</span>
-        <span class="hf-venue">${m.field} · ${m.time}</span>
+        <span class="hf-date">${escHtml(date)}</span>
+        <span class="hf-venue">${escHtml(m.field)} · ${escHtml(m.time)}</span>
       </div>
       <div class="hf-score-row">
         <span class="hf-team-label ${outcome === 'win-a' ? 'hf-winner' : ''}">Tim A</span>
-        <span class="hf-score">${m.scoreA} – ${m.scoreB}</span>
+        <span class="hf-score">${parseInt(m.scoreA) || 0} – ${parseInt(m.scoreB) || 0}</span>
         <span class="hf-team-label ${outcome === 'win-b' ? 'hf-winner' : ''}">Tim B</span>
       </div>
       <div class="hf-outcome ${outcome}">${label}</div>
       <div class="hf-rosters">
         <div class="hf-roster">
-          ${teamA.map(n => `<span class="hf-player clickable" onclick="openPlayerProfile('${n}')">${n}</span>`).join('')}
+          ${teamA.map(n => `<span class="hf-player clickable" data-profile="${escAttr(n)}">${escHtml(n)}</span>`).join('')}
         </div>
         <div class="hf-roster hf-roster-right">
-          ${teamB.map(n => `<span class="hf-player clickable" onclick="openPlayerProfile('${n}')">${n}</span>`).join('')}
+          ${teamB.map(n => `<span class="hf-player clickable" data-profile="${escAttr(n)}">${escHtml(n)}</span>`).join('')}
         </div>
       </div>
-      <button class="btn-rate-match" onclick="openRatingModal('${m.date}')">⭐ Ocijeni igrače</button>
+      <button class="btn-rate-match" data-match-date="${escAttr(m.date)}">⭐ Ocijeni igrače</button>
     </div>`;
 }
 
@@ -853,14 +904,14 @@ function renderStatsTable(history) {
             return `
             <tr${i === 0 ? ' class="st-first"' : ''}>
               <td class="st-pos">${i + 1}.</td>
-              <td class="st-name clickable" onclick="openPlayerProfile('${r.name}')">${r.name}</td>
+              <td class="st-name clickable" data-profile="${escAttr(r.name)}">${escHtml(r.name)}</td>
               <td class="st-num">${r.w}</td>
               <td class="st-num">${r.d}</td>
               <td class="st-num">${r.l}</td>
               <td class="st-num">${r.gp}</td>
               <td class="st-num st-pts">${r.pts}</td>
               <td class="st-num st-rating">${ov != null ? ov.toFixed(1) : '–'}</td>
-              <td class="st-num st-form" title="${formLabel(form)} (${form.toFixed(1)})">${formIcon(form)}</td>
+              <td class="st-num st-form" title="${escAttr(formLabel(form))} (${form.toFixed(1)})">${formIcon(form)}</td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -918,10 +969,10 @@ function openRatingModal(matchDate) {
   body.innerHTML = others.map(name => {
     const alreadyRated = DB.hasRated(matchDate, me, name);
     return `
-      <div class="rate-player-card" id="rpc-${name}">
+      <div class="rate-player-card" data-rpc="${escAttr(name)}">
         <div class="rpc-header">
-          <div class="rpc-avatar">${name.charAt(0).toUpperCase()}</div>
-          <span class="rpc-name">${name}</span>
+          <div class="rpc-avatar">${escHtml(name.charAt(0).toUpperCase())}</div>
+          <span class="rpc-name">${escHtml(name)}</span>
           ${alreadyRated ? '<span class="rpc-done">Ocijenjeno</span>' : ''}
         </div>
         ${alreadyRated ? '' : renderStarInputs(name)}
@@ -935,13 +986,13 @@ function renderStarInputs(playerName) {
   return `<div class="rpc-cats">
     ${RATING_CATS.map(c => `
       <div class="rpc-row">
-        <span class="rpc-label">${c.label}</span>
-        <div class="star-row" data-player="${playerName}" data-cat="${c.key}">
-          ${[1,2,3,4,5].map(v => `<span class="star" data-val="${v}" onclick="pickStar(this)">★</span>`).join('')}
+        <span class="rpc-label">${escHtml(c.label)}</span>
+        <div class="star-row" data-player="${escAttr(playerName)}" data-cat="${escAttr(c.key)}">
+          ${[1,2,3,4,5].map(v => `<span class="star" data-val="${v}">★</span>`).join('')}
         </div>
       </div>`).join('')}
-    <button class="btn-rate-submit" onclick="submitPlayerRating('${playerName}')">Spremi ocjenu</button>
-    <p class="rate-note" id="rate-note-${playerName}"></p>
+    <button class="btn-rate-submit" data-rate-player="${escAttr(playerName)}">Spremi ocjenu</button>
+    <p class="rate-note" data-rate-note="${escAttr(playerName)}"></p>
   </div>`;
 }
 
@@ -969,7 +1020,7 @@ function submitPlayerRating(playerName) {
   });
 
   if (!allFilled) {
-    const note = document.getElementById(`rate-note-${playerName}`);
+    const note = document.querySelector(`[data-rate-note="${playerName}"]`);
     note.textContent = 'Odaberi ocjenu za svaku kategoriju.';
     note.className = 'rate-note error';
     return;
@@ -983,11 +1034,11 @@ function submitPlayerRating(playerName) {
   });
 
   // Replace card with "done" state
-  const card = document.getElementById(`rpc-${playerName}`);
+  const card = document.querySelector(`[data-rpc="${playerName}"]`);
   card.innerHTML = `
     <div class="rpc-header">
-      <div class="rpc-avatar">${playerName.charAt(0).toUpperCase()}</div>
-      <span class="rpc-name">${playerName}</span>
+      <div class="rpc-avatar">${escHtml(playerName.charAt(0).toUpperCase())}</div>
+      <span class="rpc-name">${escHtml(playerName)}</span>
       <span class="rpc-done">Ocijenjeno</span>
     </div>`;
 }
@@ -1022,9 +1073,9 @@ function openPlayerProfile(playerName) {
     body.innerHTML = `
       <div class="prof-card">
         <div class="prof-header">
-          <div class="prof-avatar">${playerName.charAt(0).toUpperCase()}</div>
+          <div class="prof-avatar">${escHtml(playerName.charAt(0).toUpperCase())}</div>
           <div class="prof-info">
-            <div class="prof-name">${playerName}</div>
+            <div class="prof-name">${escHtml(playerName)}</div>
             <div class="prof-meta">Nema ocjena</div>
           </div>
         </div>
@@ -1049,9 +1100,9 @@ function openPlayerProfile(playerName) {
   body.innerHTML = `
     <div class="prof-card">
       <div class="prof-header">
-        <div class="prof-avatar">${playerName.charAt(0).toUpperCase()}</div>
+        <div class="prof-avatar">${escHtml(playerName.charAt(0).toUpperCase())}</div>
         <div class="prof-info">
-          <div class="prof-name">${playerName}</div>
+          <div class="prof-name">${escHtml(playerName)}</div>
           <div class="prof-meta">${avgs._count} ocjen${avgs._count === 1 ? 'a' : avgs._count < 5 ? 'e' : 'a'}</div>
         </div>
       </div>

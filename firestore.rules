@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: je li korisnik autentificiran?
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Helper: je li korisnikov email na whitelisti?
+    // Koristi 'allowedEmails' kolekciju gdje je doc ID = email adresa.
+    // Dvoslojna zaštita: Firebase Auth + email whitelist u Firestore.
+    function emailAllowed() {
+      return isAuth() &&
+        exists(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email));
+    }
+
+    // Helper: je li korisnik admin?
+    function isAdmin() {
+      return emailAllowed() &&
+        get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.role == 'admin';
+    }
+
+    // ── users kolekcija ──────────────────────────────────────────────
+    // Čitanje: whitelisted korisnici. Pisanje: samo admini.
+    match /users/{nick} {
+      allow read:  if emailAllowed();
+      allow write: if isAdmin();
+    }
+
+    // ── allowedEmails kolekcija (whitelist za rules) ─────────────────
+    // Čitanje: autentificirani (trebaju provjeriti sebe). Pisanje: samo admini.
+    match /allowedEmails/{email} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ── config/session ───────────────────────────────────────────────
+    // Čitanje: whitelisted. Pisanje: samo admini.
+    match /config/{docId} {
+      allow read:  if emailAllowed();
+      allow write: if isAdmin();
+    }
+
+    // ── players ──────────────────────────────────────────────────────
+    // Čitanje: whitelisted. Pisanje: whitelisted (igrač se može prijaviti).
+    match /players/{playerId} {
+      allow read:  if emailAllowed();
+      allow write: if emailAllowed();
+    }
+
+    // ── history ──────────────────────────────────────────────────────
+    // Čitanje: whitelisted. Pisanje: samo admini.
+    match /history/{matchId} {
+      allow read:  if emailAllowed();
+      allow write: if isAdmin();
+    }
+
+    // ── ratings ──────────────────────────────────────────────────────
+    // Čitanje: whitelisted. Pisanje: whitelisted (samo za sebe kao rater).
+    match /ratings/{ratingId} {
+      allow read:  if emailAllowed();
+      allow create: if emailAllowed() &&
+        request.resource.data.rater == get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.nick;
+      allow update, delete: if false;
+    }
+  }
+}

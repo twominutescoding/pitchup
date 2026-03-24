@@ -162,6 +162,23 @@ const DB = (() => {
       console.info('DB: Firestore history seeded');
     }
 
+    // allowedEmails — whitelist za Firestore Security Rules
+    // Doc ID = email, sadrži nick i role za provjeru u rules
+    const aeSnap = await _db.collection('allowedEmails').limit(1).get();
+    if (aeSnap.empty) {
+      const users = _cache.users || SEED_USERS;
+      const batch2 = _db.batch();
+      users.forEach(u => {
+        batch2.set(_db.collection('allowedEmails').doc(u.email), {
+          nick: u.nick,
+          role: u.role,
+          email: u.email,
+        });
+      });
+      await batch2.commit();
+      console.info('DB: Firestore allowedEmails seeded');
+    }
+
     // Players i ratings — prazne kolekcije, ne treba seed
   }
 
