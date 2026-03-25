@@ -311,7 +311,7 @@ function bootApp() {
         case 'close-my-profile': closeMyProfile(); break;
         case 'save-my-profile':  saveMyProfile(); break;
         case 'popup-open-profile':
-          if (_pitchPopupPlayer) { hidePitchPopup(); openPlayerProfile(_pitchPopupPlayer); }
+          if (_pitchPopupPlayer) { const pn = _pitchPopupPlayer; hidePitchPopup(); openPlayerProfile(pn); }
           break;
       }
       return;
