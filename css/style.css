@@ -650,6 +650,21 @@ main {
   padding: 0;
 }
 
+.btn-remove-player {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  border-radius: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.btn-remove-player:hover { color: #e06060; background: rgba(224,96,96,0.1); }
+
 .empty-state {
   text-align: center;
   padding: 22px 0;
@@ -1385,8 +1400,9 @@ main {
 }
 
 .radar-svg {
-  width: 240px;
-  height: 240px;
+  width: 100%;
+  max-width: 340px;
+  height: auto;
 }
 
 /* Form row in profile */
@@ -1892,7 +1908,7 @@ main {
   .rpc-label { font-size: 0.82rem; }
 
   /* Radar chart */
-  .radar-svg { width: 220px; height: 220px; }
+  .radar-svg { width: 100%; max-width: 280px; height: auto; }
   .prof-card { padding: 16px; }
   .prof-avatar { width: 44px; height: 44px; }
 

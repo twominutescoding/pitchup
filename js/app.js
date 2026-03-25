@@ -310,6 +310,7 @@ function bootApp() {
         case 'open-my-profile':  openMyProfile(); break;
         case 'close-my-profile': closeMyProfile(); break;
         case 'save-my-profile':  saveMyProfile(); break;
+        case 'remove-player':    unregisterPlayer(actionEl.dataset.playerName); break;
         case 'popup-open-profile':
           if (_pitchPopupPlayer) { const pn = _pitchPopupPlayer; hidePitchPopup(); openPlayerProfile(pn); }
           break;
@@ -532,6 +533,29 @@ function registerPlayer() {
   render();
 }
 
+function unregisterPlayer(name) {
+  if (!sessionOpen()) return;
+  if (name !== currentNick() && !isAdmin()) return;
+
+  const idx = state.players.findIndex(p => p.name === name);
+  if (idx === -1) return;
+
+  state.players.splice(idx, 1);
+  if (state.session.teamsDrawn) {
+    state.session = { ...state.session, teamsDrawn: false, markerTeam: null };
+    state.players.forEach(p => { p.team = null; });
+    DB.saveSession(state.session);
+  }
+  DB.savePlayers(state.players);
+
+  if (name === currentNick()) {
+    document.getElementById('register-btn').disabled = false;
+    showNote(`${name} je odjavljen.`, 'success');
+  }
+  if (isAdmin()) refreshAdminPanel();
+  render();
+}
+
 function showNote(msg, type) {
   const el = document.getElementById('reg-note');
   el.textContent = msg;
@@ -714,6 +738,19 @@ function renderPlayers() {
 
     bottomRow.appendChild(av);
     bottomRow.appendChild(nm);
+
+    // X gumb za odjavu — vidljiv sebi i adminu (samo dok su prijave otvorene)
+    const canRemove = sessionOpen() && (player.name === currentNick() || isAdmin());
+    if (canRemove) {
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn-remove-player';
+      removeBtn.textContent = '✕';
+      removeBtn.title = player.name === currentNick() ? 'Odjavi se' : `Odjavi ${player.name}`;
+      removeBtn.dataset.action = 'remove-player';
+      removeBtn.dataset.playerName = player.name;
+      bottomRow.appendChild(removeBtn);
+    }
+
     chip.appendChild(bottomRow);
 
     grid.appendChild(chip);
@@ -1264,7 +1301,14 @@ function closePlayerProfile() {
 }
 
 function renderRadarChart(avgs) {
-  const size = 240, cx = size / 2, cy = size / 2, R = 90;
+  const mob = window.innerWidth <= 680;
+  const R = 80;
+  const padX = 90;  // horizontalni padding za duge labele (Pozicioniranje)
+  const padY = 50;
+  const W = R * 2 + padX * 2;
+  const H = R * 2 + padY * 2;
+  const cx = W / 2, cy = H / 2;
+  const labelFont = mob ? 13 : 11;
   const cats = RATING_CATS;
   const n = cats.length;
 
@@ -1301,14 +1345,14 @@ function renderRadarChart(avgs) {
   // Labels
   const labels = cats.map((c, i) => {
     const angle  = (i / n) * 2 * Math.PI - Math.PI / 2;
-    const lr     = R + 18;
+    const lr     = R + 16;
     const lx     = cx + lr * Math.cos(angle);
     const ly     = cy + lr * Math.sin(angle);
     const anchor = Math.abs(Math.cos(angle)) < 0.1 ? 'middle' : Math.cos(angle) > 0 ? 'start' : 'end';
-    return `<text x="${lx}" y="${ly + 4}" text-anchor="${anchor}" fill="#5e8a5e" font-size="9" font-weight="600">${c.label}</text>`;
+    return `<text x="${lx}" y="${ly + 4}" text-anchor="${anchor}" fill="#5e8a5e" font-size="${labelFont}" font-weight="600">${c.label}</text>`;
   }).join('');
 
-  return `<svg viewBox="0 0 ${size} ${size}" class="radar-svg">
+  return `<svg viewBox="0 0 ${W} ${H}" class="radar-svg">
     ${rings}${axes}
     <polygon points="${dataPoints}" fill="rgba(48,147,58,0.25)" stroke="#30933a" stroke-width="2"/>
     ${cats.map((c, i) => {
