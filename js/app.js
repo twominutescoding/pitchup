@@ -302,6 +302,7 @@ function bootApp() {
         case 'lock-session':     lockSession(); break;
         case 'close-session':    closeSession(); break;
         case 'add-player-admin': addPlayerAsAdmin(); break;
+        case 'add-user-admin-new': addUserAsAdmin(); break;
         case 'submit-result':    submitResult(); break;
         case 'show-history':     showHistoryTab(); break;
         case 'hide-history':     hideHistoryTab(); break;
@@ -310,6 +311,9 @@ function bootApp() {
         case 'open-my-profile':  openMyProfile(); break;
         case 'close-my-profile': closeMyProfile(); break;
         case 'save-my-profile':  saveMyProfile(); break;
+        case 'open-members':     openManageMembers(); break;
+        case 'close-members':    closeManageMembers(); break;
+        case 'delete-user':      deleteUserAsAdmin(actionEl.dataset.email); break;
         case 'remove-player':    unregisterPlayer(actionEl.dataset.playerName); break;
         case 'popup-open-profile':
           if (_pitchPopupPlayer) { const pn = _pitchPopupPlayer; hidePitchPopup(); openPlayerProfile(pn); }
@@ -330,6 +334,14 @@ function bootApp() {
 
     const starEl = e.target.closest('.star[data-val]');
     if (starEl) { pickStar(starEl); return; }
+  });
+
+  // Change event for role select in manage members overlay
+  document.getElementById('manage-members-body').addEventListener('change', e => {
+    const select = e.target.closest('.member-role-select');
+    if (select) {
+      changeUserRole(select.dataset.email, select.value);
+    }
   });
 }
 
@@ -474,6 +486,59 @@ function addPlayerAsAdmin() {
   DB.savePlayers(state.players);
   render();
   refreshAdminPanel();
+}
+
+function addUserAsAdmin() {
+  const emailInput = document.getElementById('add-user-email');
+  const nickInput  = document.getElementById('add-user-nick');
+  const roleSelect = document.getElementById('add-user-role');
+  const note       = document.getElementById('add-user-note');
+
+  const email = (emailInput.value || '').trim().toLowerCase();
+  const nick  = (nickInput.value || '').trim();
+  const role  = roleSelect.value;
+
+  note.textContent = '';
+  note.className   = 'admin-note';
+
+  if (!email || !email.includes('@')) {
+    note.textContent = 'Unesi valjani email.';
+    note.className   = 'admin-note error';
+    return;
+  }
+  if (!nick) {
+    note.textContent = 'Nick ne može biti prazan.';
+    note.className   = 'admin-note error';
+    return;
+  }
+  if (state.users.some(u => u.email === email)) {
+    note.textContent = 'Korisnik s tim emailom već postoji.';
+    note.className   = 'admin-note error';
+    return;
+  }
+
+  const ok = DB.addUser({ email, nick, role });
+  if (!ok) {
+    note.textContent = 'Greška pri dodavanju korisnika.';
+    note.className   = 'admin-note error';
+    return;
+  }
+
+  state.users = DB.getUsers();
+  emailInput.value = '';
+  nickInput.value  = '';
+  roleSelect.value = 'user';
+
+  note.textContent = `${nick} je dodan!`;
+  note.className   = 'admin-note success';
+  clearTimeout(note._t);
+  note._t = setTimeout(() => { note.textContent = ''; note.className = 'admin-note'; }, 3000);
+
+  // Refresh members list if overlay is open
+  if (!document.getElementById('manage-members').classList.contains('hidden')) {
+    openManageMembers();
+  }
+  if (isAdmin()) refreshAdminPanel();
 }
 
 function submitResult() {
@@ -1429,6 +1494,10 @@ function openMyProfile() {
       </div>`;
   }
 
+  const manageMembersBtn = isAdmin()
+    ? `<button class="btn-manage-members" data-action="open-members">Upravljaj članovima</button>`
+    : '';
+
   body.innerHTML = `
     <div class="prof-card">
       <div class="prof-header">
@@ -1448,6 +1517,7 @@ function openMyProfile() {
       ${statsHtml}
       ${formHtml}
       ${radarHtml}
+      ${manageMembersBtn}
     </div>`;
 
   document.getElementById('my-profile').classList.remove('hidden');
@@ -1455,6 +1525,73 @@ function openMyProfile() {
 
 function closeMyProfile() {
   document.getElementById('my-profile').classList.add('hidden');
+}
+
+// ── Manage members overlay ──────────────────────────────────────────────────
+
+function openManageMembers() {
+  const body = document.getElementById('manage-members-body');
+  const me = currentUser().email;
+
+  const formHtml = `
+    <div class="members-add-form">
+      <input type="email" id="add-user-email" class="admin-input" placeholder="Email">
+      <input type="text" id="add-user-nick" class="admin-input" placeholder="Nick" maxlength="20">
+      <select id="add-user-role" class="admin-select" style="flex:0 0 auto;width:auto;">
+        <option value="user">User</option>
+        <option value="admin">Admin</option>
+      </select>
+      <button class="btn-admin" data-action="add-user-admin-new">Dodaj novog člana</button>
+    </div>
+    <p class="admin-note" id="add-user-note"></p>`;
+
+  const rows = state.users.map(u => {
+    const isSelf = u.email === me;
+    const roleSelect = isSelf
+      ? `<span class="member-role-tag">${escHtml(u.role)}</span>`
+      : `<select class="admin-select member-role-select" data-email="${escAttr(u.email)}">
+          <option value="user"${u.role === 'user' ? ' selected' : ''}>user</option>
+          <option value="admin"${u.role === 'admin' ? ' selected' : ''}>admin</option>
+        </select>`;
+    const deleteBtn = isSelf
+      ? ''
+      : `<button class="btn-remove-player member-delete" data-action="delete-user" data-email="${escAttr(u.email)}" title="Obriši člana">✕</button>`;
+    return `
+      <div class="member-row${isSelf ? ' member-self' : ''}">
+        <div class="member-info">
+          <span class="member-nick">${escHtml(u.nick)}</span>
+          <span class="member-email">${escHtml(u.email)}</span>
+        </div>
+        ${roleSelect}
+        ${deleteBtn}
+      </div>`;
+  }).join('');
+
+  body.innerHTML = formHtml + `<div class="members-list">${rows}</div>`;
+  document.getElementById('manage-members').classList.remove('hidden');
+}
+
+function closeManageMembers() {
+  document.getElementById('manage-members').classList.add('hidden');
+}
+
+function deleteUserAsAdmin(email) {
+  if (!email || email === currentUser().email) return;
+  if (!confirm(`Obrisati korisnika ${email}?`)) return;
+
+  const ok = DB.deleteUser(email);
+  if (ok) {
+    state.users = DB.getUsers();
+    openManageMembers(); // refresh list
+  }
+}
+
+function changeUserRole(email, newRole) {
+  if (!email || email === currentUser().email) return;
+  if (newRole !== 'user' && newRole !== 'admin') return;
+
+  DB.updateUser(email, { role: newRole });
+  state.users = DB.getUsers();
 }
 
 function saveMyProfile() {

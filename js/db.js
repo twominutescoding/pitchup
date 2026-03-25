@@ -329,15 +329,35 @@ const DB = (() => {
       }
     },
 
+    addUser(user) {
+      const { email, nick, role } = user;
+      if (!email || !nick) return false;
+
+      // Provjera duplikata
+      if ((_cache.users || []).some(u => u.email === email)) return false;
+
+      const newUser = { email, nick, role: role || 'user' };
+      _cache.users = _cache.users || [];
+      _cache.users.push(newUser);
+      lsSave(KEYS.users, _cache.users);
+
+      if (_useFirestore) {
+        _db.collection('users').doc(email).set(newUser)
+          .catch(e => console.error('addUser:', e));
+      }
+      return true;
+    },
+
     updateUser(email, data) {
-      // Samo nick se može mijenjati
-      const allowed = { nick: data.nick };
-      if (!allowed.nick) return;
+      const allowed = {};
+      if (data.nick) allowed.nick = data.nick;
+      if (data.role) allowed.role = data.role;
+      if (!Object.keys(allowed).length) return;
 
       // Ažuriraj cache
       const user = (_cache.users || []).find(u => u.email === email);
       if (user) {
-        user.nick = allowed.nick;
+        Object.assign(user, allowed);
         lsSave(KEYS.users, _cache.users);
       }
 
@@ -346,6 +366,21 @@ const DB = (() => {
         _db.collection('users').doc(email).update(allowed)
           .catch(e => console.error('updateUser:', e));
       }
+    },
+
+    deleteUser(email) {
+      if (!email) return false;
+      const idx = (_cache.users || []).findIndex(u => u.email === email);
+      if (idx === -1) return false;
+
+      _cache.users.splice(idx, 1);
+      lsSave(KEYS.users, _cache.users);
+
+      if (_useFirestore) {
+        _db.collection('users').doc(email).delete()
+          .catch(e => console.error('deleteUser:', e));
+      }
+      return true;
     },
 
     hasRated(matchDate, rater, rated) {
