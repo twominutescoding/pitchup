@@ -1836,7 +1836,7 @@ main {
   }
 
   /* Layout */
-  .left-panel  { overflow-y: visible; min-height: auto; }
+  .left-panel  { overflow-y: visible; min-height: auto; gap: 0; }
   .right-panel { min-height: auto; }
   .pitch-card  { flex: none; min-height: auto; overflow-x: hidden; overflow-y: visible; }
   .pitch-wrap  { flex: none; min-height: auto; aspect-ratio: 500 / 320; }
@@ -1922,8 +1922,14 @@ main {
   .my-prof-stats { gap: 6px; }
   .my-prof-stat { padding: 8px 6px; }
 
-  /* Pitch ispod svega */
-  .right-panel { order: 1; }
+  /* Redoslijed na mobileu: session bar → reg → igrači → TEREN → admin → povijest */
+  .left-panel   { display: contents; }
+  .session-bar  { order: 1; }
+  .reg-card     { order: 2; }
+  .players-card { order: 3; }
+  .right-panel  { order: 4; }
+  .admin-card   { order: 5; }
+  .history-card { order: 6; }
 
   /* Prevent any child from causing horizontal overflow */
   .left-panel, .right-panel, .card { max-width: 100%; overflow-x: hidden; }
