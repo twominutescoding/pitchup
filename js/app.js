@@ -267,8 +267,24 @@ function bootApp() {
     renderHistory();
   });
 
+  // SVG pitch click → player popup
+  document.getElementById('pitch').addEventListener('click', e => {
+    const markerGroup = e.target.closest('[data-player-name]');
+    if (markerGroup) {
+      e.stopPropagation();
+      showPitchPopup(markerGroup.dataset.playerName);
+      return;
+    }
+    // Click on pitch but not on a marker → close popup
+    hidePitchPopup();
+  });
+
   document.addEventListener('click', e => {
     if (!e.target.closest('.cs')) closeAllCs();
+    // Close pitch popup on click outside
+    if (_pitchPopupPlayer && !e.target.closest('#pitch-popup') && !e.target.closest('#pitch')) {
+      hidePitchPopup();
+    }
 
     // Centralni delegirani event handler za data-action atribute
     const actionEl = e.target.closest('[data-action]');
@@ -294,6 +310,9 @@ function bootApp() {
         case 'open-my-profile':  openMyProfile(); break;
         case 'close-my-profile': closeMyProfile(); break;
         case 'save-my-profile':  saveMyProfile(); break;
+        case 'popup-open-profile':
+          if (_pitchPopupPlayer) { hidePitchPopup(); openPlayerProfile(_pitchPopupPlayer); }
+          break;
       }
       return;
     }
@@ -718,12 +737,13 @@ function renderPitch() {
   const container = document.getElementById('pitch-players');
   const hint      = document.getElementById('pitch-hint');
   container.innerHTML = '';
+  hidePitchPopup();
 
   if (!state.session.teamsDrawn) {
     if (state.players.length > 0) renderUnassigned(container, state.players);
     hint.textContent = isAdmin()
-      ? 'Žrijebaj timove kako bi rasporedio igrače na teren.'
-      : 'Admin će napraviti žrijeb kad se skupi dovoljno igrača.';
+      ? 'Ždrijebaj timove kako bi rasporedio igrače na teren.'
+      : 'Admin će napraviti ždrijeb kad se skupi dovoljno igrača.';
     document.getElementById('team-comparison').classList.add('hidden');
     return;
   }
@@ -766,39 +786,55 @@ function renderUnassigned(container, players) {
 }
 
 function drawPlayerMarker(container, player, x, y, gradId, statsText) {
+  const mob = window.innerWidth <= 680;
+  const R = mob ? 14 : 10;
+  const fontSize = mob ? 9 : 7;
+  const statsFontSize = mob ? 7 : 5.5;
+  const charW = mob ? 6.0 : 5.0;
+  const statsCharW = mob ? 5.0 : 4.2;
+  const shadowOffY = mob ? 16 : 12;
+  const shadowRx = mob ? 11 : 8;
+  const shadowRy = mob ? 4 : 3;
+  const shineOffX = mob ? -4 : -3;
+  const shineOffY = mob ? -5 : -3.5;
+  const shineRx = mob ? 5 : 3.5;
+  const shineRy = mob ? 3.5 : 2.5;
+
   const g = svgEl('g');
+  g.setAttribute('data-player-name', player.name);
+  g.setAttribute('style', 'cursor:pointer;pointer-events:all');
 
   const shadow = svgEl('ellipse');
   shadow.setAttribute('cx', x + 1);
-  shadow.setAttribute('cy', y + 12);
-  shadow.setAttribute('rx', '8');
-  shadow.setAttribute('ry', '3');
+  shadow.setAttribute('cy', y + shadowOffY);
+  shadow.setAttribute('rx', shadowRx);
+  shadow.setAttribute('ry', shadowRy);
   shadow.setAttribute('fill', 'rgba(0,0,0,0.50)');
   shadow.setAttribute('filter', 'url(#f-shadow)');
 
   const circle = svgEl('circle');
   circle.setAttribute('cx', x);
   circle.setAttribute('cy', y);
-  circle.setAttribute('r', '10');
+  circle.setAttribute('r', R);
   circle.setAttribute('fill', `url(#${gradId})`);
   circle.setAttribute('stroke', 'rgba(255,255,255,0.75)');
   circle.setAttribute('stroke-width', '1.5');
 
   const shine = svgEl('ellipse');
-  shine.setAttribute('cx', x - 3);
-  shine.setAttribute('cy', y - 3.5);
-  shine.setAttribute('rx', '3.5');
-  shine.setAttribute('ry', '2.5');
+  shine.setAttribute('cx', x + shineOffX);
+  shine.setAttribute('cy', y + shineOffY);
+  shine.setAttribute('rx', shineRx);
+  shine.setAttribute('ry', shineRy);
   shine.setAttribute('fill', 'rgba(255,255,255,0.30)');
-  shine.setAttribute('transform', `rotate(-25,${x - 3},${y - 3.5})`);
+  shine.setAttribute('transform', `rotate(-25,${x + shineOffX},${y + shineOffY})`);
 
   const hasStats = statsText && statsText.length > 0;
   const name = trunc(player.name, 8);
-  const statsW = hasStats ? Math.max(0, statsText.length * 4.2 + 8) : 0;
-  const lw   = Math.max(26, name.length * 5.0 + 8, statsW);
+  const statsW = hasStats ? Math.max(0, statsText.length * statsCharW + 8) : 0;
+  const lw   = Math.max(mob ? 34 : 26, name.length * charW + 8, statsW);
   const lx   = x - lw / 2;
-  const ly   = y + 12;
-  const lh   = hasStats ? 21 : 11;
+  const ly   = y + shadowOffY;
+  const lh   = hasStats ? (mob ? 27 : 21) : (mob ? 15 : 11);
 
   const labelBg = svgEl('rect');
   labelBg.setAttribute('x', lx);
@@ -810,10 +846,10 @@ function drawPlayerMarker(container, player, x, y, gradId, statsText) {
 
   const text = svgEl('text');
   text.setAttribute('x', x);
-  text.setAttribute('y', ly + 8);
+  text.setAttribute('y', ly + (mob ? 10 : 8));
   text.setAttribute('text-anchor', 'middle');
   text.setAttribute('fill', 'rgba(255,255,255,0.95)');
-  text.setAttribute('font-size', '7');
+  text.setAttribute('font-size', fontSize);
   text.setAttribute('font-weight', '700');
   text.setAttribute('font-family', '-apple-system,Helvetica,sans-serif');
   text.textContent = name;
@@ -827,10 +863,10 @@ function drawPlayerMarker(container, player, x, y, gradId, statsText) {
   if (hasStats) {
     const statsEl = svgEl('text');
     statsEl.setAttribute('x', x);
-    statsEl.setAttribute('y', ly + 17);
+    statsEl.setAttribute('y', ly + (mob ? 22 : 17));
     statsEl.setAttribute('text-anchor', 'middle');
     statsEl.setAttribute('fill', 'rgba(255,255,200,0.80)');
-    statsEl.setAttribute('font-size', '5.5');
+    statsEl.setAttribute('font-size', statsFontSize);
     statsEl.setAttribute('font-weight', '600');
     statsEl.setAttribute('font-family', '-apple-system,Helvetica,sans-serif');
     statsEl.textContent = statsText;
@@ -1529,6 +1565,55 @@ function generatePositions(n) {
     positions.b.push({ x: 400 - (i % 2) * 60, y });
   }
   return positions;
+}
+
+// ── Pitch popup ───────────────────────────────────────────────────────────
+
+let _pitchPopupPlayer = null;
+
+function showPitchPopup(playerName) {
+  _pitchPopupPlayer = playerName;
+  const popup = document.getElementById('pitch-popup');
+
+  document.getElementById('pitch-popup-avatar').textContent = playerName.charAt(0).toUpperCase();
+  document.getElementById('pitch-popup-name').textContent = playerName;
+
+  // Team label
+  const player = state.players.find(p => p.name === playerName);
+  const teamEl = document.getElementById('pitch-popup-team');
+  if (player && player.team === 'a') teamEl.textContent = 'Tim A';
+  else if (player && player.team === 'b') teamEl.textContent = 'Tim B';
+  else teamEl.textContent = '';
+
+  // Stats
+  const statsEl = document.getElementById('pitch-popup-stats');
+  let statsHtml = '';
+
+  const overall = getPlayerOverall(playerName);
+  if (overall != null) {
+    statsHtml += `<span class="pitch-popup-stat"><span class="pitch-popup-stat-label">Rating</span><span class="pitch-popup-stat-val" style="color:var(--gold-hl)">★ ${overall.toFixed(1)}</span></span>`;
+  }
+
+  const form = calcPlayerForm(playerName);
+  if (form > 1) {
+    statsHtml += `<span class="pitch-popup-stat"><span class="pitch-popup-stat-label">Forma</span><span class="pitch-popup-stat-val">${formIcon(form)} ${formLabel(form)}</span></span>`;
+  }
+
+  const history = DB.getHistory();
+  const allStats = calcPlayerStats(history);
+  const ps = allStats.find(s => s.name === playerName);
+  if (ps) {
+    statsHtml += `<span class="pitch-popup-stat"><span class="pitch-popup-stat-label">W/D/L</span><span class="pitch-popup-stat-val">${ps.w}/${ps.d}/${ps.l}</span></span>`;
+    statsHtml += `<span class="pitch-popup-stat"><span class="pitch-popup-stat-label">GP</span><span class="pitch-popup-stat-val">${ps.gp}</span></span>`;
+  }
+
+  statsEl.innerHTML = statsHtml;
+  popup.classList.remove('hidden');
+}
+
+function hidePitchPopup() {
+  _pitchPopupPlayer = null;
+  document.getElementById('pitch-popup').classList.add('hidden');
 }
 
 // ── Utils ──────────────────────────────────────────────────────────────────

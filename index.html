@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'none';
-    script-src 'self' https://www.gstatic.com/firebasejs/ https://accounts.google.com/gsi/;
+    script-src 'self' https://www.gstatic.com/firebasejs/ https://accounts.google.com/gsi/ https://apis.google.com;
     style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/;
     connect-src http://localhost:* https://firestore.googleapis.com https://*.firebaseio.com https://www.googleapis.com https://www.gstatic.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://accounts.google.com/;
     img-src 'self' https://*.googleusercontent.com https://*.ggpht.com https://*.google.com data:;
-    frame-src https://accounts.google.com/;
+    frame-src https://accounts.google.com/ https://*.firebaseapp.com;
     font-src 'self';
     base-uri 'self';
     form-action 'none';
@@ -26,7 +26,7 @@
       <span class="ball">⚽</span>
       <div class="header-text">
         <h1>Srijeda Nogomet</h1>
-        <span class="tagline">Amaterska liga</span>
+        <span class="tagline">PARAOLIMPIJADA</span>
       </div>
       <div class="header-right">
         <span class="reg-status" id="reg-status"></span>
@@ -137,7 +137,7 @@
             <span class="section-label">Prijavljeni</span>
             <span id="player-count" class="badge">0</span>
           </div>
-          <button id="draw-btn" class="btn-draw hidden" data-action="draw-teams">🎲 Žrijebaj</button>
+          <button id="draw-btn" class="btn-draw hidden" data-action="draw-teams">🎲 Ždrijebaj</button>
         </div>
         <div id="team-legend" class="team-legend hidden"></div>
         <div id="players-list"></div>
@@ -321,7 +321,20 @@
             <g id="pitch-players"></g>
           </svg>
         </div>
-        <p id="pitch-hint" class="pitch-hint">Žrijebaj timove kako bi vidio raspored igrača na terenu.</p>
+        <p id="pitch-hint" class="pitch-hint">Ždrijebaj timove kako bi vidio raspored igrača na terenu.</p>
+        <div id="pitch-popup" class="pitch-popup hidden">
+          <div class="pitch-popup-inner">
+            <div class="pitch-popup-header">
+              <div class="pitch-popup-avatar" id="pitch-popup-avatar">L</div>
+              <div class="pitch-popup-info">
+                <span class="pitch-popup-name" id="pitch-popup-name"></span>
+                <span class="pitch-popup-team" id="pitch-popup-team"></span>
+              </div>
+            </div>
+            <div class="pitch-popup-stats" id="pitch-popup-stats"></div>
+            <button class="pitch-popup-profile" data-action="popup-open-profile">Profil →</button>
+          </div>
+        </div>
         <div id="team-comparison" class="team-comparison hidden"></div>
       </div>
     </div>

@@ -1621,6 +1621,113 @@ main {
   color: var(--muted);
 }
 
+/* ── Pitch popup ─────────────────────────────────────── */
+.pitch-card { position: relative; }
+
+.pitch-popup {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  max-width: 240px;
+  width: 90%;
+  animation: pitchPopupIn 0.15s ease;
+}
+
+@keyframes pitchPopupIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.pitch-popup-inner {
+  background: var(--bg-card);
+  border: 1px solid var(--border-hl);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.65);
+}
+
+.pitch-popup-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.pitch-popup-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #d8ecd8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.pitch-popup-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pitch-popup-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.pitch-popup-team {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pitch-popup-stats {
+  font-size: 0.78rem;
+  color: var(--text);
+  margin-bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.pitch-popup-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pitch-popup-stat-label {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.pitch-popup-stat-val {
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.pitch-popup-profile {
+  width: 100%;
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.pitch-popup-profile:hover { border-color: var(--green-hl); color: var(--green-hl); }
+
 /* ── Team comparison ──────────────────────────────────── */
 .team-comparison {
   border-top: 1px solid var(--border);
@@ -1701,7 +1808,7 @@ main {
 
 /* ── Mobile ───────────────────────────────────────────── */
 @media (max-width: 680px) {
-  html, body { overflow: auto; height: auto; }
+  html, body { overflow-x: hidden; overflow-y: auto; height: auto; max-width: 100vw; }
 
   main {
     grid-template-columns: 1fr;
@@ -1709,19 +1816,20 @@ main {
     gap: 8px;
     height: auto;
     overflow: visible;
+    max-width: 100vw;
   }
 
   /* Layout */
   .left-panel  { overflow-y: visible; min-height: auto; }
   .right-panel { min-height: auto; }
-  .pitch-card  { flex: none; min-height: auto; overflow: visible; }
+  .pitch-card  { flex: none; min-height: auto; overflow-x: hidden; overflow-y: visible; }
   .pitch-wrap  { flex: none; min-height: auto; aspect-ratio: 500 / 320; }
   #pitch       { height: auto; }
 
   /* Header: kompaktni za mobile */
   header { height: 50px; }
   :root { --header-h: 50px; }
-  .header-inner { padding: 0 12px; gap: 8px; }
+  .header-inner { padding: 0 12px; gap: 8px; overflow: hidden; }
   .header-text .tagline { display: none; }
   h1 { font-size: 0.9rem; letter-spacing: 1.5px; }
   .ball { font-size: 1.3rem; }
@@ -1800,14 +1908,22 @@ main {
 
   /* Pitch ispod svega */
   .right-panel { order: 1; }
+
+  /* Prevent any child from causing horizontal overflow */
+  .left-panel, .right-panel, .card { max-width: 100%; overflow-x: hidden; }
+  .pitch-wrap { max-width: 100%; }
+  .history-score { overflow: hidden; }
 }
 
 /* ── Extra small (<400px) ────────────────────────────── */
 @media (max-width: 400px) {
   main { padding: 6px; gap: 6px; }
 
-  h1 { font-size: 0.82rem; letter-spacing: 1px; }
+  h1 { font-size: 0.82rem; letter-spacing: 1px; white-space: normal; }
   .ball { font-size: 1.1rem; }
+
+  .session-bar { padding: 8px 10px; }
+  .session-controls { flex-wrap: wrap; gap: 4px; }
 
   .players-grid { grid-template-columns: 1fr; }
   .player-chip { padding: 10px 12px; }
